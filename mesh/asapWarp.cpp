@@ -2,22 +2,26 @@
 
 #include <cmath>
 
-asapWarp::asapWarp(int height, int width, int quadWidth, int quadHeight, int cellheight, int cellwidth, double weight)
+using namespace std;
+using namespace cv;
+using namespace cv::cuda;
+
+asapWarp::asapWarp(int height, int width, int cellheight, int cellwidth, double weight)
 {
 
 	this->imgHeight = height;
 	this->imgWidth = width;
-	this->quadWidth = quadWidth;
-	this->quadHeight = quadHeight;
+	this->quadWidth = width / (cellwidth - 1);
+	this->quadHeight = height / (cellheight - 1);
 	this->height = cellheight;
 	this->width = cellwidth;
-	printf("cellh = %d, cellw = %d\n", cellheight, cellwidth);
 
 	// each cell only got 4 triangles with x, y -> total 8 equations one cell
 	num_smooth_cons = (this->height-1)*(this->width-1)*8;
-	columns = this->height*this->width*2;
+	allVertexNum = this->height*this->width;
+	columns = allVertexNum*2;
 	num_data_cons = 0;
-	this->Constraints = Mat::zeros(num_smooth_cons + num_data_cons, columns, CV_64FC1);
+	this->Constraints = Mat::zeros(num_smooth_cons, columns, CV_64FC1);
 	SCc = 1;
 
 	CreateSmoothCons(weight);
@@ -27,69 +31,46 @@ asapWarp::~asapWarp(){}
 
 // this calc the weights of 4 corners for each feature points
 // eg. the weights of quad(i,j)
-void asapWarp::SetControlPts(vector<Point> inputsPts, vector<Point> outputsPts)
+void asapWarp::SetControlPts(vector<KeyPoint> prevPts, vector<KeyPoint> nowPts, vector<DMatch> match)
 {
-	/*
-	int len = inputsPts.size();
-	dataterm_element_orgPt = inputsPts;
-	dataterm_element_desPt = outputsPts;
+	int len = match.size();
+	num_data_cons = len*2;
 
+	// Copy smooth matrix to all
+	Mat allConstraints = Mat::zeros(num_smooth_cons + num_data_cons, columns, CV_64FC1);
+	Constraints.copyTo(allConstraints(Rect(0, 0, Constraints.cols, Constraints.rows)));
+	Constraints = allConstraints;
+
+	Constants = Mat::zeros(num_smooth_cons + num_data_cons, 1, CV_64FC1);
+
+	int ind_x, ind_y;
+	int cons = num_smooth_cons;
 	for (int i = 0; i < len; i++)
 	{
-		Point pt(inputsPts[i].x, inputsPts[i].y);
-		dataterm_element_i.push_back(floor(pt.y/quadHeight)+1);
-		dataterm_element_j.push_back(floor(pt.y/quadWidth)+1);
+		Point2d prevPt = prevPts[match[i].queryIdx].pt;
+		Point2d nowPt = nowPts[match[i].trainIdx].pt;
 
-		Quad qd = source.getQuad(dataterm_element_i[i], dataterm_element_j[i]);
-
-		float coefficients[4] = {};
-		qd.getBilinearCoordinates(pt, coefficients);
-		dataterm_element_V00.push_back(coefficients[0]);
-		dataterm_element_V01.push_back(coefficients[1]);
-		dataterm_element_V10.push_back(coefficients[2]);
-		dataterm_element_V11.push_back(coefficients[3]);
+		addDataCoefficient(cons, prevPt, nowPt);
 	}
-	*/
+	
 }
 
 void asapWarp::Solve()
 {
-	//Mat b = CreateDataCons();
-	//int N = SmoothConstraints.rows + DataConstraints.rows;
-
-	//Mat ARows = Mat::zeros(N, 1, CV_32F);
-	//Mat ACols = Mat::zeros(N, 1, CV_32F);
-	//Mat AVals = Mat::zeros(N, 1, CV_32F);
-
-	/*
-	int cc = 0;
-	for (int i = 0; i < SmoothConstraints.rows; i++)
-	{
-		ARows.at<CV_32F>(i, 1) = SmoothConstraints(i, 1)+1;
-		ARows.at<CV_32F>(i, 1) = SmoothConstraints(i, 1)+1;
-		ARows.at<CV_32F>(i, 1) = SmoothConstraints(i, 1)+1;
-		cc++;
-	}
-	for (int i = 0; i < DataConstraints.rows; i++)
-	{
-		ARows.at<CV_32F>(i, 1) = SmoothConstraints(i, 1)+1;
-		ARows.at<CV_32F>(i, 1) = SmoothConstraints(i, 1)+1;
-		ARows.at<CV_32F>(i, 1) = SmoothConstraints(i, 1)+1;
-		cc++;
-	}
-
 	// TODO: solve the linear system w/ CUDA
-	*/
-	Mat b = Mat::zeros(columns, 1, CV_64FC1);
 	Mat x;
-	bool valid = solve(Constraints, b, x, DECOMP_SVD);
-	
-	int halfcolumns = this->columns/2;
-	cellPts = vector<Point2d>(halfcolumns);
-	for (int i = 0; i < halfcolumns; ++i)
+	bool valid = solve(Constraints, Constants, x, DECOMP_SVD);
+
+	printf("x = ");
+	for(int i = 0; i < x.rows; ++i)
 	{
-		cellPts[i] = Point2d(x.at<double>(2*i, 1), x.at<double>(2*i+1, 1));
-	}
+		printf("%.2lf, ", x.at<double>(i, 0));
+	}printf("\n");
+	
+	cellPts = vector<Point2d>(allVertexNum);
+	for (int i = 0; i < allVertexNum; ++i)
+		cellPts[i] = Point2d(x.at<double>(2*i, 0), x.at<double>(2*i+1, 0));
+
 }
 
 Mat asapWarp::Warp(Mat Img, int gap)
@@ -141,7 +122,7 @@ void asapWarp::PrintVertex()
 	
 }
 
-void asapWarp::PrintConstraints()
+void asapWarp::PrintConstraints(bool all)
 {
 	printf("smoothConstraints: %d\n", num_smooth_cons);
 	double t;
@@ -149,9 +130,18 @@ void asapWarp::PrintConstraints()
 		for (int j = 0; j < columns; ++j)
 		{
 			t = Constraints.at<double>(i, j);
-			if (t != 0)
+			if (!all)
 			{
-				printf("(%d, %d) %1.2lf\n", i, j, t);
+				if (t != 0)
+					printf("(%d, %d) %.2lf\n", i, j, t);
+			}
+			else
+			{
+				if(j == 0)
+					printf("%.2lf | ", Constants.at<double>(i, 0));
+				printf("%.2lf ", t);
+				if(j == columns-1)
+					printf("\n");
 			}
 		}
 	printf("dataConstraints: %d\n", num_data_cons);
@@ -159,9 +149,18 @@ void asapWarp::PrintConstraints()
 		for (int j = 0; j < columns; ++j)
 		{
 			t = Constraints.at<double>(i, j);
-			if (t != 0)
+			if (!all)
 			{
-				printf("(%d, %d) %1.2lf\n", i, j, t);
+				if (t != 0)
+					printf("(%d, %d) %.2lf\n", i, j, t);
+			}
+			else
+			{
+				if(j == 0)
+					printf("%.2lf | ", Constants.at<double>(i, 0));
+				printf("%.2lf ", t);
+				if(j == columns-1)
+					printf("\n");
 			}
 		}
 }
@@ -179,19 +178,19 @@ int asapWarp::CreateSmoothCons(float weight)
 			i1 = i; 	j1 = j;
 			i2 = i; 	j2 = j+1;
 			i3 = i+1; 	j3 = j+1;
-			addCoefficient(cons, i1, j1, i2, j2, i3, j3, weight);
+			addSmoothCoefficient(cons, i1, j1, i2, j2, i3, j3, weight);
 			i1 = i+1; 	j1 = j+1;
 			i2 = i+1; 	j2 = j;
 			i3 = i; 	j3 = j;
-			addCoefficient(cons, i1, j1, i2, j2, i3, j3, weight);
+			addSmoothCoefficient(cons, i1, j1, i2, j2, i3, j3, weight);
 			i1 = i; 	j1 = j+1;
 			i2 = i+1; 	j2 = j+1;
 			i3 = i+1; 	j3 = j;
-			addCoefficient(cons, i1, j1, i2, j2, i3, j3, weight);
+			addSmoothCoefficient(cons, i1, j1, i2, j2, i3, j3, weight);
 			i1 = i+1; 	j1 = j;
 			i2 = i; 	j2 = j;
 			i3 = i; 	j3 = j+1;
-			addCoefficient(cons, i1, j1, i2, j2, i3, j3, weight);
+			addSmoothCoefficient(cons, i1, j1, i2, j2, i3, j3, weight);
 		}
 	return cons+1;
 }
@@ -226,12 +225,8 @@ Point2d asapWarp::compute_uv(const Point2d V1, const Point2d V2, const Point2d V
 	return Point2d(u, v);
 }
 
-int asapWarp::CreateDataCons()
-{
-	return 0;
-}
 // the triangles
-void asapWarp::addCoefficient(int & cons, int i1, int j1, int i2, int j2, int i3, int j3, double weight)
+void asapWarp::addSmoothCoefficient(int & cons, int i1, int j1, int i2, int j2, int i3, int j3, double weight)
 {
 	Point2d V1, V2, V3, uv;
 	double u, v;
@@ -253,5 +248,35 @@ void asapWarp::addCoefficient(int & cons, int i1, int j1, int i2, int j2, int i3
 	Constraints.at<double>(cons, index_x(i2, j2)) = (v)*weight;
 	Constraints.at<double>(cons, index_x(i3, j3)) = (-v)*weight;
 	Constraints.at<double>(cons, index_y(i1, j1)) = -weight;
+}
+
+void asapWarp::addDataCoefficient(int & cons, Point2d prev_pt, Point2d now_pt)
+{
+	double x = prev_pt.x;
+	double y = prev_pt.y;
+	int ind_x = int(x) / quadWidth;
+	int ind_y = int(y) / quadHeight;
+	
+	if (ind_x < width-1 && ind_y < height-1)
+	{
+		Point2d V00 = compute_pos(ind_x, ind_y);
+		Point2d V11 = compute_pos(ind_x+1, ind_y+1);
+
+		double u = (x - V00.x) / (V11.x - V00.x);
+		double v = (y - V00.y) / (V11.y - V00.y);
+	
+		cons++;
+		Constraints.at<double>(cons, index_x(ind_x, ind_y))     = (1-u)*(1-v);
+		Constraints.at<double>(cons, index_x(ind_x, ind_y+1))   = (1-u)*v;
+		Constraints.at<double>(cons, index_x(ind_x+1, ind_y))   = u*(1-v);
+		Constraints.at<double>(cons, index_x(ind_x+1, ind_y+1)) = u*v;
+		Constants.at<double>(cons, 0) 							= now_pt.x;
+		cons++;
+		Constraints.at<double>(cons, index_y(ind_x, ind_y))     = (1-u)*(1-v);
+		Constraints.at<double>(cons, index_y(ind_x, ind_y+1))   = (1-u)*v;
+		Constraints.at<double>(cons, index_y(ind_x+1, ind_y))   = u*(1-v);
+		Constraints.at<double>(cons, index_y(ind_x+1, ind_y+1)) = u*v;
+		Constants.at<double>(cons, 0) 							= now_pt.y;
+	}
 }
 // void quadWarp(Mat im, Quad q1, Quad q2);

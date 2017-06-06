@@ -3,6 +3,8 @@
 #include <vector>
 
 #include "opencv2/core.hpp"
+#include "opencv2/core/cuda.hpp"
+#include "opencv2/core/utility.hpp"
 
 //#include "mesh.h"
 //#include "quad.h"
@@ -14,16 +16,17 @@ using namespace cv::cuda;
 class asapWarp
 {
 public:
-	asapWarp(int height, int width, int quadWidth, int quadHeight, int cellheight, int cellwidth, double weight);
+	asapWarp(int height, int width, int cellheight, int cellwidth, double weight);
 	~asapWarp();
-	void SetControlPts(vector<Point> inputsPts, vector<Point> outputsPts);
+	void SetControlPts(vector<KeyPoint> prevPts, vector<KeyPoint> nowPts, vector<DMatch> match);
 	void Solve();
 	Mat Warp(Mat Img, int gap);
 	void CalcHomos(Mat **homos);
-    void PrintConstraints();
+    void PrintConstraints(bool all);
     void PrintVertex();
 
     Mat Constraints;
+    Mat Constants;
 
 	// smooth constraints
 	Mat SmoothConstraints;
@@ -53,7 +56,8 @@ public:
     // mesh
  //   Mesh source, destin;
     vector<Point2d> cellPts;
-    
+    int allVertexNum;
+
     // control points
     vector<Point> sourcePts, targetPts;
     
@@ -66,9 +70,10 @@ public:
 
 private:
 	int CreateSmoothCons(float weight);
-	int CreateDataCons();
 	// the triangles
-	void addCoefficient(int & cons, int i1, int j1, int i2, int j2, int i3, int j3, double weight);
+	void addSmoothCoefficient(int & cons, int i1, int j1, int i2, int j2, int i3, int j3, double weight);
+    void addDataCoefficient(int & cons, Point2d pts, Point2d pts2);
+
 	// void quadWarp(cv::Mat im, Quad q1, Quad q2);
 	// compute position by index
 	Point2d compute_pos(int i, int j);

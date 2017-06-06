@@ -96,7 +96,6 @@ int main(int argc, const char **argv)
     			allmatch.push_back(matches);
 			}
 
-
 			printf("points: rows: %d, cols: %d\n", cur_points.rows, cur_points.cols);
 			printf("descrip: rows: %d, cols: %d\n", cur_descriptors.rows, cur_descriptors.cols);
 		}
@@ -107,12 +106,26 @@ int main(int argc, const char **argv)
 		// model estimation
 		int height = frames[0].rows;
 		int width = frames[0].cols;
-		int cut = 2;//*2*2;
-		int quadHeight = height/cut;
-		int quadWidth = width/cut;
-		asapWarp asap = asapWarp(height, width, quadWidth, quadHeight, cut+1, cut+1, 1); 
+		int cut = 2*2*2;
+		double weight = 1;
+		asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
 		//asap.PrintConstraints();
-		//asap.SetControlPts(keypointsGPU[0], keypointsGPU[1]);
+
+		vector<KeyPoint> keypoints1, keypoints2;
+		surf.downloadKeypoints(keypointsGPU[0], keypoints1);
+    	surf.downloadKeypoints(keypointsGPU[1], keypoints2);
+
+    	/*
+		Mat img_matches;
+	    drawMatches(frames[0], keypoints1, frames[1], keypoints2, allmatch[0], img_matches);
+
+	    namedWindow("matches", 0);
+	    imshow("matches", img_matches);
+	    waitKey(0);
+	    */
+
+		asap.SetControlPts(keypoints1, keypoints2, allmatch[0]);
+		// asap.PrintConstraints(true);
 		asap.Solve();
 		asap.PrintVertex();
 		// to get homographies for each cell of each frame
