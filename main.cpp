@@ -15,6 +15,7 @@
 #include "opencv2/calib3d.hpp"
 #include "opencv2/opencv_modules.hpp"
 
+#include "./mesh/asapWarp.h"
 #include "./mesh/mesh.h"
 #include "./mesh/quad.h"
 #include "./utils/Timer.h"
@@ -56,6 +57,8 @@ int main(int argc, const char **argv)
 		// get original video and its frames
 		Ptr<VideoFileSource> source = makePtr<VideoFileSource>(inputPath);
 		cout << "total frame: " << source->count() << endl;
+		if(source->count() == 0)
+			return 0;
 		outputFps = source->fps();
 		vector<Mat> frames, gray_frames;
 		while(true)
@@ -70,11 +73,14 @@ int main(int argc, const char **argv)
 
 		// feature detect on GPU
 		vector<GpuMat> keypointsGPU, descriptorsGPU;
+		vector<vector<DMatch> > allmatch;
 		SURF_CUDA surf; // TODO: using SURF is a little slow, should change its params or change a way (Orb, FAST, BRIEF)
+		Ptr<cv::cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(surf.defaultNorm());
 		surf.hessianThreshold = 5000;
 		Timer timer_count;
 		timer_count.Start();
-		for (int i = 0; i < gray_frames.size(); i++)
+		//for (int i = 0; i < gray_frames.size(); i++)
+		for (int i = 0; i < 2; i++)
 		{
 			GpuMat cuda_frame;
 			cuda_frame.upload(gray_frames[i]);
@@ -82,11 +88,33 @@ int main(int argc, const char **argv)
 			surf(cuda_frame, GpuMat(), cur_points, cur_descriptors);
 			keypointsGPU.push_back(cur_points);
 			descriptorsGPU.push_back(cur_descriptors);
+			
+			if (i > 0)
+			{
+				vector<DMatch> matches;
+    			matcher->match(descriptorsGPU[i-1], descriptorsGPU[i], matches);
+    			allmatch.push_back(matches);
+			}
+
+
+			printf("points: rows: %d, cols: %d\n", cur_points.rows, cur_points.cols);
+			printf("descrip: rows: %d, cols: %d\n", cur_descriptors.rows, cur_descriptors.cols);
 		}
 		timer_count.Pause();
 		printf_timer(timer_count);
+		
 
 		// model estimation
+		int height = frames[0].rows;
+		int width = frames[0].cols;
+		int cut = 2;//*2*2;
+		int quadHeight = height/cut;
+		int quadWidth = width/cut;
+		asapWarp asap = asapWarp(height, width, quadWidth, quadHeight, cut+1, cut+1, 1); 
+		//asap.PrintConstraints();
+		//asap.SetControlPts(keypointsGPU[0], keypointsGPU[1]);
+		asap.Solve();
+		asap.PrintVertex();
 		// to get homographies for each cell of each frame
 
 		// bundled camera path
