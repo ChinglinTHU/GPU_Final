@@ -1,18 +1,20 @@
 #include <iostream>
-#include <cuda_runtime.h>
-#include "cusolverSp.h"
-#include "sparsesolver.cpp"
+// #include <cuda_runtime.h>
+// #include "cusolverSp.h"
+#include "opencv2/core.hpp"
+#include "cuSpSolver.h"
+
 using namespace std;
 
 int main()
 {
-	cudaError_t cudaStat;
-	cusolverStatus_t solver_status;
-	cusparseStatus_t sparse_status;
-	cusolverSpHandle_t solver_handle = 0;
-	cusparseHandle_t sparse_handle = 0;
-	cusparseMatDescr_t descr = 0;
-
+	// cudaError_t cudaStat;
+	// cusolverStatus_t solver_status;
+	// cusparseStatus_t sparse_status;
+	// cusolverSpHandle_t solver_handle = 0;
+	// cusparseHandle_t sparse_handle = 0;
+	// cusparseMatDescr_t descr = 0;
+	cout<<CV_VERSION<<endl;
 	int m = 4;
 	int nnz = 9;
 
@@ -83,8 +85,7 @@ int main()
 	float XHost[m] = {0.0};
 	// cudaMemcpy(XHost, x, (size_t)(m*sizeof(x[0])), cudaMemcpyDeviceToHost);
 
-	SparseSolver mySolver;
-	mySolver.Solve(ARowHost, AColHost, AValHost, BHost, XHost, m, nnz);
+	cuSpSolver(ARowHost, AColHost, AValHost, BHost, XHost, m, nnz);
 
 	// output x
 	cout << "x: [";
