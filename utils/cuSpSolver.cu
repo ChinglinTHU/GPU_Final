@@ -1,4 +1,4 @@
-#include "./sparsesolver.h"
+#include "./cuSpSolver.h"
 #include <iostream>
 #include <cuda_runtime.h>
 #include "cusolverSp.h"
