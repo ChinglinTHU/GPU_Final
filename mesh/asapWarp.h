@@ -6,6 +6,9 @@
 #include "opencv2/core/cuda.hpp"
 #include "opencv2/core/utility.hpp"
 
+#include "opencv2/calib3d.hpp"
+//#include "opencv2/nonfree.hpp"
+
 //#include "mesh.h"
 //#include "quad.h"
 
@@ -21,7 +24,7 @@ public:
 	void SetControlPts(vector<KeyPoint> prevPts, vector<KeyPoint> nowPts, vector<DMatch> match);
 	void Solve();
 	Mat Warp(Mat Img, int gap);
-	void CalcHomos(Mat **homos);
+	void CalcHomos(Mat homos);
     void PrintConstraints(bool all);
     void PrintVertex();
 
@@ -29,22 +32,8 @@ public:
     Mat Constants;
 
 	// smooth constraints
-	Mat SmoothConstraints;
-	float SCc;
 	int num_smooth_cons;
-
 	// data constraints
-	// TODO: convert vector into ptr
-    vector<int> dataterm_element_i;
-    vector<int> dataterm_element_j;
-    vector<Point> dataterm_element_orgPt;
-    vector<Point> dataterm_element_desPt;
-    vector<float> dataterm_element_V00;
-    vector<float> dataterm_element_V01;
-    vector<float> dataterm_element_V10;
-    vector<float> dataterm_element_V11;
-    Mat DataConstraints;
-    float DCc;
     int num_data_cons;
         
     int rowCount;
@@ -53,8 +42,6 @@ public:
     vector<int> x_index;
     vector<int> y_index;
     
-    // mesh
- //   Mesh source, destin;
     vector<Point2d> cellPts;
     int allVertexNum;
 

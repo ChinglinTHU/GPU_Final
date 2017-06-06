@@ -128,8 +128,11 @@ int main(int argc, const char **argv)
 		// asap.PrintConstraints(true);
 		asap.Solve();
 		asap.PrintVertex();
-		// to get homographies for each cell of each frame
 
+		// to get homographies for each cell of each frame
+		Mat homo = Mat::zeros(cut, cut, CV_64FC(9));
+		asap.CalcHomos(homo);
+		
 		// bundled camera path
 
 		// path optimization

@@ -6,6 +6,9 @@ using namespace std;
 using namespace cv;
 using namespace cv::cuda;
 
+typedef Vec<float, 9> Vec9f;
+typedef Vec<double, 9> Vec9d;
+
 asapWarp::asapWarp(int height, int width, int cellheight, int cellwidth, double weight)
 {
 
@@ -22,7 +25,6 @@ asapWarp::asapWarp(int height, int width, int cellheight, int cellwidth, double 
 	columns = allVertexNum*2;
 	num_data_cons = 0;
 	this->Constraints = Mat::zeros(num_smooth_cons, columns, CV_64FC1);
-	SCc = 1;
 
 	CreateSmoothCons(weight);
 }
@@ -60,16 +62,10 @@ void asapWarp::Solve()
 	// TODO: solve the linear system w/ CUDA
 	Mat x;
 	bool valid = solve(Constraints, Constants, x, DECOMP_SVD);
-
-	printf("x = ");
-	for(int i = 0; i < x.rows; ++i)
-	{
-		printf("%.2lf, ", x.at<double>(i, 0));
-	}printf("\n");
 	
 	cellPts = vector<Point2d>(allVertexNum);
 	for (int i = 0; i < allVertexNum; ++i)
-		cellPts[i] = Point2d(x.at<double>(2*i, 0), x.at<double>(2*i+1, 0));
+		cellPts[i] = Point2d(x.at<double>(2*i, 0)+compute_pos(i%width, i/width).x, x.at<double>(2*i+1, 0)+compute_pos(i%width, i/width).y);
 
 }
 
@@ -99,15 +95,39 @@ Mat asapWarp::Warp(Mat Img, int gap)
 	*/
 }
 
-void asapWarp::CalcHomos(Mat** homos)
+void asapWarp::CalcHomos(Mat homos)
 {
-	for (int i = 0; i < height; i++)
-		for (int j = 0; j < width; j++)
+//	homos = Mat::zeros(height-1, width-1, CV_64FC(9));
+	vector<Point2d> V(4);
+	vector<Point2d> W(4);
+	Mat h;
+	for (int i = 0; i < height-1; i++)
+		for (int j = 0; j < width-1; j++)
 		{
-			//Quad q1 = source.getQuad(i,j);
-			//Quad q2 = destin.getQuad(i,j);
+			V[0] = compute_pos(i, j);
+			V[1] = compute_pos(i, j+1);
+			V[2] = compute_pos(i+1, j);
+			V[3] = compute_pos(i+1, j+1);
+			W[0] = cellPts[j*width + i];
+			W[1] = cellPts[(j+1)*width + i];
+			W[2] = cellPts[j*width + (i+1)];
+			W[3] = cellPts[(j+1)*width + (i+1)];
 
-			// Mat src = Mat::zeros();
+			h = findHomography(V, W);
+			homos.at<double>(i, j) = 0;
+
+			//printf("%d, %d, %d\n", homos.cols, homos.rows, homos.channels());
+			//printf("%lf ", homos.at<Vec9d>(i, j)[5]);
+
+			homos.at<Vec9d>(i, j)[0] = h.at<double>(0, 0);
+			homos.at<Vec9d>(i, j)[1] = h.at<double>(0, 1);
+			homos.at<Vec9d>(i, j)[2] = h.at<double>(0, 2);
+			homos.at<Vec9d>(i, j)[3] = h.at<double>(1, 0);
+			homos.at<Vec9d>(i, j)[4] = h.at<double>(1, 1);
+			homos.at<Vec9d>(i, j)[5] = h.at<double>(1, 2);
+			homos.at<Vec9d>(i, j)[6] = h.at<double>(2, 0);
+			homos.at<Vec9d>(i, j)[7] = h.at<double>(2, 1);
+			homos.at<Vec9d>(i, j)[8] = h.at<double>(2, 2);
 		}
 }
 
@@ -119,7 +139,7 @@ void asapWarp::PrintVertex()
 			printf("\n");
 		printf("(%.2f, %.2f), ", cellPts[i].x, cellPts[i].y);
 	}
-	
+	printf("\n");	
 }
 
 void asapWarp::PrintConstraints(bool all)
@@ -270,13 +290,13 @@ void asapWarp::addDataCoefficient(int & cons, Point2d prev_pt, Point2d now_pt)
 		Constraints.at<double>(cons, index_x(ind_x, ind_y+1))   = (1-u)*v;
 		Constraints.at<double>(cons, index_x(ind_x+1, ind_y))   = u*(1-v);
 		Constraints.at<double>(cons, index_x(ind_x+1, ind_y+1)) = u*v;
-		Constants.at<double>(cons, 0) 							= now_pt.x;
+		Constants.at<double>(cons, 0) 							= now_pt.x - prev_pt.x;
 		cons++;
 		Constraints.at<double>(cons, index_y(ind_x, ind_y))     = (1-u)*(1-v);
 		Constraints.at<double>(cons, index_y(ind_x, ind_y+1))   = (1-u)*v;
 		Constraints.at<double>(cons, index_y(ind_x+1, ind_y))   = u*(1-v);
 		Constraints.at<double>(cons, index_y(ind_x+1, ind_y+1)) = u*v;
-		Constants.at<double>(cons, 0) 							= now_pt.y;
+		Constants.at<double>(cons, 0) 							= now_pt.y - prev_pt.y;
 	}
 }
 // void quadWarp(Mat im, Quad q1, Quad q2);
