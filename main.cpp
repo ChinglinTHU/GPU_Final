@@ -16,8 +16,7 @@
 #include "opencv2/opencv_modules.hpp"
 
 #include "./mesh/asapWarp.h"
-#include "./mesh/mesh.h"
-#include "./mesh/quad.h"
+#include "./path/allPath.h"
 #include "./utils/Timer.h"
 
 #define arg(name) cmd.get<string>(name)
@@ -89,7 +88,7 @@ int main(int argc, const char **argv)
 		Timer timer_count;
 		timer_count.Start();
 	//	for (int i = 0; i < gray_frames.size(); i++)
-		for (int i = 0; i < 50; i++)
+		for (int i = 0; i < 20; i++)
 		{
 			printf("Computing %d frame feature\n", i);
 			GpuMat cuda_frame;
@@ -148,7 +147,7 @@ int main(int argc, const char **argv)
 			asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
 			asap.SetControlPts(vec_now_pts[i], vec_next_pts[i]);
 			asap.Solve();
-			asap.PrintVertex();		
+			// asap.PrintVertex();		
 			
 			// to get homographies for each cell of each frame
 			Mat homo = Mat::zeros(cut, cut, CV_32FC(9));
@@ -161,29 +160,27 @@ int main(int argc, const char **argv)
 		}
 
 		vector<Mat> Vec;
-		Mat homo = Mat::zeros(3, 3, CV_32FC1);
-		homo.at<float>(0, 0) = 1.f;
-		homo.at<float>(1, 1) = 1.f;
-		homo.at<float>(2, 2) = 1.f;
-		for (int i = 0; i < VecHomo.size(); i++)
+		allPath allpath = allPath(cut, cut, VecHomo.size()+1);
+		Mat homo = Mat::eye(3, 3, CV_32FC1);
+
+		for (int t = 0; t < VecHomo.size(); t++)
 	//	for (int i = 0; i < 11; i++)
 		{
-			printf("Compute path at time %d\n", i);	
-			Vec9f tmp = VecHomo[i].at<Vec9f>(0, 0);
-			Mat homo_now = Mat::zeros(3, 3, CV_32FC1);
-			homo_now.at<float>(0, 0) = tmp[0];
-			homo_now.at<float>(0, 1) = tmp[1];
-			homo_now.at<float>(0, 2) = tmp[2];
-			homo_now.at<float>(1, 0) = tmp[3];
-			homo_now.at<float>(1, 1) = tmp[4];
-			homo_now.at<float>(1, 2) = tmp[5];
-			homo_now.at<float>(2, 0) = tmp[6];
-			homo_now.at<float>(2, 1) = tmp[7];
-			homo_now.at<float>(2, 2) = tmp[8];
-			homo = homo * homo_now;
+			printf("Compute path at time %d\n", t);	
+			for (int i = 0; i < cut; i++)
+				for (int j = 0; j < cut; j++)
+				{
+					Vec9f tmp = VecHomo[t].at<Vec9f>(i, j);
+					allpath.setHomo(i, j, t, tmp);
+				}
 
-			cout << i << " path" << endl;
-			cout << homo << endl;
+		}
+		allpath.computePath();
+		vector<Mat> path = allpath.getPath(4, 4);
+		for (int i = 0; i < path.size(); i++)
+		{	
+			cout << "test path: " << i << endl;
+			cout << path[i] << endl;
 		}
 
 		/*
