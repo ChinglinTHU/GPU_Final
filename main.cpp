@@ -87,8 +87,8 @@ int main(int argc, const char **argv)
 		surf.hessianThreshold = 5000;
 		Timer timer_count;
 		timer_count.Start();
-	//	for (int i = 0; i < gray_frames.size(); i++)
-		for (int i = 0; i < 20; i++)
+		for (int i = 0; i < gray_frames.size(); i++)
+	//	for (int i = 0; i < 100; i++)
 		{
 			printf("Computing %d frame feature\n", i);
 			GpuMat cuda_frame;
@@ -154,19 +154,16 @@ int main(int argc, const char **argv)
 			asap.CalcHomos(homo);
 			VecHomo.push_back(homo);
 
-		//	Mat img_matches;
-    	//	drawMatches(Mat(frames[i]), keypoints1, Mat(frames[i+1]), keypoints2, allmatch[i], img_matches);
-    	//	VecImg.push_back(img_matches);
 		}
 
+		// Compute bundled camera path
 		vector<Mat> Vec;
 		allPath allpath = allPath(cut, cut, VecHomo.size()+1);
 		Mat homo = Mat::eye(3, 3, CV_32FC1);
-
 		for (int t = 0; t < VecHomo.size(); t++)
 	//	for (int i = 0; i < 11; i++)
 		{
-			printf("Compute path at time %d\n", t);	
+			printf("Compute bundled camera path at time %d\n", t);	
 			for (int i = 0; i < cut; i++)
 				for (int j = 0; j < cut; j++)
 				{
@@ -176,12 +173,51 @@ int main(int argc, const char **argv)
 
 		}
 		allpath.computePath();
-		vector<Mat> path = allpath.getPath(4, 4);
+		allpath.optimizePath(20);
+
+		vector<Mat> path = allpath.getPath(7, 7);
+		vector<Mat> optpath = allpath.getOptimizedPath(7, 7);
 		for (int i = 0; i < path.size(); i++)
 		{	
-			cout << "test path: " << i << endl;
-			cout << path[i] << endl;
+			//cout << "test path: " << i << endl;
+			//cout << path[i] << endl;
+			//cout << optpath[i] << endl;
 		}
+
+		Mat picture(1000, 1000, CV_8UC3, Scalar(255,255,255));  
+		vector<Point2f> center(1);
+		vector<Point2f> move(1);
+		vector<Point2f> stable(1);
+		vector<Point2f> tmp(1);
+
+		float scale = 1.f;
+		Point2f offset1(300.f, 450.f);
+		Point2f offset2(300.f, 450.f);
+		for (int i = 0; i < path.size(); i++)
+		{
+			if (i == 0)
+			{
+				center[0] = Point2f(10.f, 10.f);
+				move[0]   = scale*center[0] + offset2;
+				stable[0] = scale*center[0] + offset1;
+			}
+			else
+			{
+				tmp[0] = move[0];
+				perspectiveTransform(center, move, path[i]);
+				move[0] = move[0]*scale + offset2;
+				arrowedLine(picture, tmp[0], move[0], Scalar(255,0,0));  // blue 
+				tmp[0] = stable[0];
+				perspectiveTransform(center, stable, optpath[i]);
+				stable[0] = stable[0]*scale + offset1;
+				arrowedLine(picture, tmp[0], stable[0], Scalar(0,0,255));  // red
+			}
+		}
+		namedWindow("Display window", WINDOW_AUTOSIZE);
+		imshow("Display window", picture );
+		waitKey(0);
+
+		imwrite("optimize_path.png", picture);
 
 		/*
 		imwrite("match_00.png", VecImg[0]);
