@@ -1,5 +1,6 @@
 #include "asapWarp.h"
 
+#include <iostream>
 #include <cmath>
 
 using namespace std;
@@ -9,7 +10,7 @@ using namespace cv::cuda;
 typedef Vec<float, 9> Vec9f;
 typedef Vec<double, 9> Vec9d;
 
-asapWarp::asapWarp(int height, int width, int cellheight, int cellwidth, double weight)
+asapWarp::asapWarp(int height, int width, int cellheight, int cellwidth, float weight)
 {
 
 	this->imgHeight = height;
@@ -24,7 +25,7 @@ asapWarp::asapWarp(int height, int width, int cellheight, int cellwidth, double 
 	allVertexNum = this->height*this->width;
 	columns = allVertexNum*2;
 	num_data_cons = 0;
-	this->Constraints = Mat::zeros(num_smooth_cons, columns, CV_64FC1);
+	this->Constraints = Mat::zeros(num_smooth_cons, columns, CV_32FC1);
 
 	CreateSmoothCons(weight);
 }
@@ -33,26 +34,24 @@ asapWarp::~asapWarp(){}
 
 // this calc the weights of 4 corners for each feature points
 // eg. the weights of quad(i,j)
-void asapWarp::SetControlPts(vector<KeyPoint> prevPts, vector<KeyPoint> nowPts, vector<DMatch> match)
+void asapWarp::SetControlPts(vector<Point2f> prevPts, vector<Point2f> nowPts)
+// void asapWarp::SetControlPts(vector<KeyPoint> prevPts, vector<KeyPoint> nowPts, vector<DMatch> match)
 {
-	int len = match.size();
+	int len = prevPts.size();
 	num_data_cons = len*2;
 
 	// Copy smooth matrix to all
-	Mat allConstraints = Mat::zeros(num_smooth_cons + num_data_cons, columns, CV_64FC1);
+	Mat allConstraints = Mat::zeros(num_smooth_cons + num_data_cons, columns, CV_32FC1);
 	Constraints.copyTo(allConstraints(Rect(0, 0, Constraints.cols, Constraints.rows)));
 	Constraints = allConstraints;
 
-	Constants = Mat::zeros(num_smooth_cons + num_data_cons, 1, CV_64FC1);
+	Constants = Mat::zeros(num_smooth_cons + num_data_cons, 1, CV_32FC1);
 
 	int ind_x, ind_y;
 	int cons = num_smooth_cons;
 	for (int i = 0; i < len; i++)
 	{
-		Point2d prevPt = prevPts[match[i].queryIdx].pt;
-		Point2d nowPt = nowPts[match[i].trainIdx].pt;
-
-		addDataCoefficient(cons, prevPt, nowPt);
+		addDataCoefficient(cons, prevPts[i], nowPts[i]);
 	}
 	
 }
@@ -63,9 +62,9 @@ void asapWarp::Solve()
 	Mat x;
 	bool valid = solve(Constraints, Constants, x, DECOMP_SVD);
 	
-	cellPts = vector<Point2d>(allVertexNum);
+	cellPts = vector<Point2f>(allVertexNum);
 	for (int i = 0; i < allVertexNum; ++i)
-		cellPts[i] = Point2d(x.at<double>(2*i, 0)+compute_pos(i%width, i/width).x, x.at<double>(2*i+1, 0)+compute_pos(i%width, i/width).y);
+		cellPts[i] = Point2f(x.at<float>(2*i, 0)+compute_pos(i%width, i/width).x, x.at<float>(2*i+1, 0)+compute_pos(i%width, i/width).y);
 
 }
 
@@ -97,9 +96,9 @@ Mat asapWarp::Warp(Mat Img, int gap)
 
 void asapWarp::CalcHomos(Mat homos)
 {
-//	homos = Mat::zeros(height-1, width-1, CV_64FC(9));
-	vector<Point2d> V(4);
-	vector<Point2d> W(4);
+//	homos = Mat::zeros(height-1, width-1, CV_32FC(9));
+	vector<Point2f> V(4);
+	vector<Point2f> W(4);
 	Mat h;
 	for (int i = 0; i < height-1; i++)
 		for (int j = 0; j < width-1; j++)
@@ -113,21 +112,20 @@ void asapWarp::CalcHomos(Mat homos)
 			W[2] = cellPts[j*width + (i+1)];
 			W[3] = cellPts[(j+1)*width + (i+1)];
 
+			// findHomography return mat with double type
 			h = findHomography(V, W);
-			homos.at<double>(i, j) = 0;
-
 			//printf("%d, %d, %d\n", homos.cols, homos.rows, homos.channels());
 			//printf("%lf ", homos.at<Vec9d>(i, j)[5]);
 
-			homos.at<Vec9d>(i, j)[0] = h.at<double>(0, 0);
-			homos.at<Vec9d>(i, j)[1] = h.at<double>(0, 1);
-			homos.at<Vec9d>(i, j)[2] = h.at<double>(0, 2);
-			homos.at<Vec9d>(i, j)[3] = h.at<double>(1, 0);
-			homos.at<Vec9d>(i, j)[4] = h.at<double>(1, 1);
-			homos.at<Vec9d>(i, j)[5] = h.at<double>(1, 2);
-			homos.at<Vec9d>(i, j)[6] = h.at<double>(2, 0);
-			homos.at<Vec9d>(i, j)[7] = h.at<double>(2, 1);
-			homos.at<Vec9d>(i, j)[8] = h.at<double>(2, 2);
+			homos.at<Vec9f>(i, j)[0] = h.at<double>(0, 0);
+			homos.at<Vec9f>(i, j)[1] = h.at<double>(0, 1);
+			homos.at<Vec9f>(i, j)[2] = h.at<double>(0, 2);
+			homos.at<Vec9f>(i, j)[3] = h.at<double>(1, 0);
+			homos.at<Vec9f>(i, j)[4] = h.at<double>(1, 1);
+			homos.at<Vec9f>(i, j)[5] = h.at<double>(1, 2);
+			homos.at<Vec9f>(i, j)[6] = h.at<double>(2, 0);
+			homos.at<Vec9f>(i, j)[7] = h.at<double>(2, 1);
+			homos.at<Vec9f>(i, j)[8] = h.at<double>(2, 2);
 		}
 }
 
@@ -145,11 +143,11 @@ void asapWarp::PrintVertex()
 void asapWarp::PrintConstraints(bool all)
 {
 	printf("smoothConstraints: %d\n", num_smooth_cons);
-	double t;
+	float t;
 	for (int i = 0; i < num_smooth_cons; ++i)
 		for (int j = 0; j < columns; ++j)
 		{
-			t = Constraints.at<double>(i, j);
+			t = Constraints.at<float>(i, j);
 			if (!all)
 			{
 				if (t != 0)
@@ -158,7 +156,7 @@ void asapWarp::PrintConstraints(bool all)
 			else
 			{
 				if(j == 0)
-					printf("%.2lf | ", Constants.at<double>(i, 0));
+					printf("%.2lf | ", Constants.at<float>(i, 0));
 				printf("%.2lf ", t);
 				if(j == columns-1)
 					printf("\n");
@@ -168,7 +166,7 @@ void asapWarp::PrintConstraints(bool all)
 	for (int i = num_smooth_cons; i < num_smooth_cons+num_data_cons; ++i)
 		for (int j = 0; j < columns; ++j)
 		{
-			t = Constraints.at<double>(i, j);
+			t = Constraints.at<float>(i, j);
 			if (!all)
 			{
 				if (t != 0)
@@ -177,7 +175,7 @@ void asapWarp::PrintConstraints(bool all)
 			else
 			{
 				if(j == 0)
-					printf("%.2lf | ", Constants.at<double>(i, 0));
+					printf("%.2lf | ", Constants.at<float>(i, 0));
 				printf("%.2lf ", t);
 				if(j == columns-1)
 					printf("\n");
@@ -190,7 +188,7 @@ int asapWarp::CreateSmoothCons(float weight)
 	// Constraints = Mat(num_smooth_cons + num_data_cons, this.height*this.width, CV_32F);
 	int cons = -1;
 	int i1, i2, i3, j1, j2, j3;
-	Point2d V1, V2, V3, uv;
+	Point2f V1, V2, V3, uv;
 	float u, v;
 	for (int i = 0; i < height-1; i++)
 		for (int j = 0; j < width-1; j++)
@@ -225,31 +223,31 @@ int asapWarp::index_y(int i, int j)
 	return 2*(j*width + i)+1;
 }
 
-Point2d asapWarp::compute_pos(int i, int j)
+Point2f asapWarp::compute_pos(int i, int j)
 {
-	double x = i < this->width - 1 ? i * this->quadWidth : this->imgWidth;
-	double y = j < this->height - 1 ? j * this->quadHeight : this->imgHeight;
-	return Point2d(x, y);
+	float x = i < this->width - 1 ? i * this->quadWidth : this->imgWidth;
+	float y = j < this->height - 1 ? j * this->quadHeight : this->imgHeight;
+	return Point2f(x, y);
 }
 
-Point2d asapWarp::compute_uv(const Point2d V1, const Point2d V2, const Point2d V3)
+Point2f asapWarp::compute_uv(const Point2f V1, const Point2f V2, const Point2f V3)
 {
-	Point2d V21 = V1 - V2;
-	Point2d V23 = V3 - V2;
-	double d1 = norm(V21);
-	double d3 = norm(V23);
-	double u = (V21.x*V23.x + V21.y*V23.y) / (d1 * d3);
-	double v = sqrt(1-u*u);
+	Point2f V21 = V1 - V2;
+	Point2f V23 = V3 - V2;
+	float d1 = norm(V21);
+	float d3 = norm(V23);
+	float u = (V21.x*V23.x + V21.y*V23.y) / (d1 * d3);
+	float v = sqrt(1-u*u);
 	u = u * d1 / d3;
 	v = v * d1 / d3;
-	return Point2d(u, v);
+	return Point2f(u, v);
 }
 
 // the triangles
-void asapWarp::addSmoothCoefficient(int & cons, int i1, int j1, int i2, int j2, int i3, int j3, double weight)
+void asapWarp::addSmoothCoefficient(int & cons, int i1, int j1, int i2, int j2, int i3, int j3, float weight)
 {
-	Point2d V1, V2, V3, uv;
-	double u, v;
+	Point2f V1, V2, V3, uv;
+	float u, v;
 	V1 = compute_pos(i1, j1);
 	V2 = compute_pos(i2, j2);
 	V3 = compute_pos(i3, j3);
@@ -257,46 +255,46 @@ void asapWarp::addSmoothCoefficient(int & cons, int i1, int j1, int i2, int j2, 
 	u = uv.x;
 	v = uv.y;
 	cons++;
-	Constraints.at<double>(cons, index_x(i2, j2)) = (1-u)*weight;
-	Constraints.at<double>(cons, index_x(i3, j3)) = (u)*weight;
-	Constraints.at<double>(cons, index_y(i3, j3)) = (v)*weight;
-	Constraints.at<double>(cons, index_y(i2, j2)) = (-v)*weight;
-	Constraints.at<double>(cons, index_x(i1, j1)) = -weight;
+	Constraints.at<float>(cons, index_x(i2, j2)) = (1-u)*weight;
+	Constraints.at<float>(cons, index_x(i3, j3)) = (u)*weight;
+	Constraints.at<float>(cons, index_y(i3, j3)) = (v)*weight;
+	Constraints.at<float>(cons, index_y(i2, j2)) = (-v)*weight;
+	Constraints.at<float>(cons, index_x(i1, j1)) = -weight;
 	cons++;
-	Constraints.at<double>(cons, index_y(i2, j2)) = (1-u)*weight;
-	Constraints.at<double>(cons, index_y(i3, j3)) = (u)*weight;
-	Constraints.at<double>(cons, index_x(i2, j2)) = (v)*weight;
-	Constraints.at<double>(cons, index_x(i3, j3)) = (-v)*weight;
-	Constraints.at<double>(cons, index_y(i1, j1)) = -weight;
+	Constraints.at<float>(cons, index_y(i2, j2)) = (1-u)*weight;
+	Constraints.at<float>(cons, index_y(i3, j3)) = (u)*weight;
+	Constraints.at<float>(cons, index_x(i2, j2)) = (v)*weight;
+	Constraints.at<float>(cons, index_x(i3, j3)) = (-v)*weight;
+	Constraints.at<float>(cons, index_y(i1, j1)) = -weight;
 }
 
-void asapWarp::addDataCoefficient(int & cons, Point2d prev_pt, Point2d now_pt)
+void asapWarp::addDataCoefficient(int & cons, Point2f prev_pt, Point2f now_pt)
 {
-	double x = prev_pt.x;
-	double y = prev_pt.y;
+	float x = prev_pt.x;
+	float y = prev_pt.y;
 	int ind_x = int(x) / quadWidth;
 	int ind_y = int(y) / quadHeight;
 	
 	if (ind_x < width-1 && ind_y < height-1)
 	{
-		Point2d V00 = compute_pos(ind_x, ind_y);
-		Point2d V11 = compute_pos(ind_x+1, ind_y+1);
+		Point2f V00 = compute_pos(ind_x, ind_y);
+		Point2f V11 = compute_pos(ind_x+1, ind_y+1);
 
-		double u = (x - V00.x) / (V11.x - V00.x);
-		double v = (y - V00.y) / (V11.y - V00.y);
+		float u = (x - V00.x) / (V11.x - V00.x);
+		float v = (y - V00.y) / (V11.y - V00.y);
 	
 		cons++;
-		Constraints.at<double>(cons, index_x(ind_x, ind_y))     = (1-u)*(1-v);
-		Constraints.at<double>(cons, index_x(ind_x, ind_y+1))   = (1-u)*v;
-		Constraints.at<double>(cons, index_x(ind_x+1, ind_y))   = u*(1-v);
-		Constraints.at<double>(cons, index_x(ind_x+1, ind_y+1)) = u*v;
-		Constants.at<double>(cons, 0) 							= now_pt.x - prev_pt.x;
+		Constraints.at<float>(cons, index_x(ind_x, ind_y))     = (1-u)*(1-v);
+		Constraints.at<float>(cons, index_x(ind_x, ind_y+1))   = (1-u)*v;
+		Constraints.at<float>(cons, index_x(ind_x+1, ind_y))   = u*(1-v);
+		Constraints.at<float>(cons, index_x(ind_x+1, ind_y+1)) = u*v;
+		Constants.at<float>(cons, 0) 							= now_pt.x - prev_pt.x;
 		cons++;
-		Constraints.at<double>(cons, index_y(ind_x, ind_y))     = (1-u)*(1-v);
-		Constraints.at<double>(cons, index_y(ind_x, ind_y+1))   = (1-u)*v;
-		Constraints.at<double>(cons, index_y(ind_x+1, ind_y))   = u*(1-v);
-		Constraints.at<double>(cons, index_y(ind_x+1, ind_y+1)) = u*v;
-		Constants.at<double>(cons, 0) 							= now_pt.y - prev_pt.y;
+		Constraints.at<float>(cons, index_y(ind_x, ind_y))     = (1-u)*(1-v);
+		Constraints.at<float>(cons, index_y(ind_x, ind_y+1))   = (1-u)*v;
+		Constraints.at<float>(cons, index_y(ind_x+1, ind_y))   = u*(1-v);
+		Constraints.at<float>(cons, index_y(ind_x+1, ind_y+1)) = u*v;
+		Constants.at<float>(cons, 0) 							= now_pt.y - prev_pt.y;
 	}
 }
 // void quadWarp(Mat im, Quad q1, Quad q2);

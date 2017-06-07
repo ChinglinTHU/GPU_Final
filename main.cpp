@@ -31,11 +31,15 @@ using namespace cv;
 using namespace cv::videostab;
 using namespace cv::cuda;
 
+typedef Vec<float, 9> Vec9f;
+typedef Vec<double, 9> Vec9d;
+
 Ptr<IFrameSource> stabilizedFrames;
 string saveMotionsPath;
 double outputFps;
 string outputPath;
 bool quietMode;
+
 
 void matches2points(const vector<KeyPoint>& train, const vector<KeyPoint>& query,
         const std::vector<cv::DMatch>& matches, std::vector<cv::Point2f>& pts_train,
@@ -77,14 +81,15 @@ int main(int argc, const char **argv)
 
 		// feature detect on GPU
 		vector<GpuMat> keypointsGPU, descriptorsGPU;
-		vector<vector<DMatch> > allmatch;
+		vector<vector<Point2f>> vec_now_pts, vec_next_pts;
+		vector<Mat> vec_global_homo;
 		SURF_CUDA surf; // TODO: using SURF is a little slow, should change its params or change a way (Orb, FAST, BRIEF)
 		Ptr<cv::cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(surf.defaultNorm());
 		surf.hessianThreshold = 5000;
 		Timer timer_count;
 		timer_count.Start();
 	//	for (int i = 0; i < gray_frames.size(); i++)
-		for (int i = 0; i < 20; i++)
+		for (int i = 0; i < 50; i++)
 		{
 			printf("Computing %d frame feature\n", i);
 			GpuMat cuda_frame;
@@ -93,11 +98,40 @@ int main(int argc, const char **argv)
 			surf(cuda_frame, GpuMat(), cur_points, cur_descriptors);
 			keypointsGPU.push_back(cur_points);
 			descriptorsGPU.push_back(cur_descriptors);
+
+			if (i > 0)
+			{
+				// match feature points
+				vector<KeyPoint> keypoints1, keypoints2;
+				surf.downloadKeypoints(keypointsGPU[i-1], keypoints1);
+	    		surf.downloadKeypoints(keypointsGPU[i], keypoints2);
+
+	    		vector<DMatch> matches, ransac_matches;
+				vector<Point2f> now_pts, next_pts;
+				vector<unsigned char> match_mask;
+	   			matcher->match(descriptorsGPU[i-1], descriptorsGPU[i], matches);
+	   			matches2points(keypoints1, keypoints2, matches, now_pts, next_pts);
+
+	   			// find global & pick out outliers
+	   			// findHomography return mat with double type
+	   			Mat globalHomo = findHomography(now_pts, next_pts, RANSAC, 4, match_mask);
+	   			for (int j = match_mask.size() - 1; j >= 0; j--)
+	   				if (match_mask[j] == 0)
+	   				{
+	   					now_pts.erase(now_pts.begin()+j);
+	   					next_pts.erase(next_pts.begin()+j);
+	   				}
+	   			if(now_pts.size() != next_pts.size())
+	   			   	throw runtime_error("matching points have different size\n");
+	   			printf("total ransac_matches = %d\n", now_pts.size());
+	   			vec_now_pts.push_back(now_pts);
+	   			vec_next_pts.push_back(next_pts);
+	   			vec_global_homo.push_back(globalHomo);
+   			}
 		}
 		timer_count.Pause();
 		printf_timer(timer_count);
 		
-
 		// model estimation
 		int height = frames[0].rows;
 		int width = frames[0].cols;
@@ -105,65 +139,54 @@ int main(int argc, const char **argv)
 		double weight = 1;
 		
 		vector<Mat> VecHomo;
-		vector<Mat> VecImg;
-    //	for (int i = 0; i < gray_frames.size()-1; i++)
-		for (int i = 0; i < 11; i++)
+	//	vector<Mat> VecImg;
+    	for (int i = 0; i < vec_now_pts.size(); i++)
+	//	for (int i = 0; i < 40; i++)
 		{
-			printf("Computing %d and %d frame Homographies\n", i, i+1);
-			vector<KeyPoint> keypoints1, keypoints2;
-			surf.downloadKeypoints(keypointsGPU[i], keypoints1);
-    		surf.downloadKeypoints(keypointsGPU[i+1], keypoints2);
-
-			// match feature points
-			vector<DMatch> matches, ransac_matches;
-			vector<Point2f> prev_pts, now_pts;
-			vector<unsigned char> match_mask;
-   			matcher->match(descriptorsGPU[i], descriptorsGPU[i+1], matches);
-   			matches2points(keypoints1, keypoints2, matches, prev_pts, now_pts);
-   			for (int j = 0; j < prev_pts.size(); j++)
-   			{
-   				printf("(%.2f, %.2f) -> (%.2f, %.2f)\t\t", prev_pts[j].x, prev_pts[j].y)
-   			}
-
-   			// find global & pick out outliers
-   			Mat globalHomo = findHomography(prev_pts, now_pts, RANSAC, 3, match_mask);
-   			vector<Point2f> warp_pts;
-   			perspectiveTransform(prev_pts, warp_pts, globalHomo);
-   			printf("==========================\n");
-   			printf("%.2f %.2f %.2f\n", globalHomo.at<float>(0, 0), globalHomo.at<float>(0, 1), globalHomo.at<float>(0, 2));
-   			printf("%.2f %.2f %.2f\n", globalHomo.at<float>(1, 0), globalHomo.at<float>(1, 1), globalHomo.at<float>(1, 2));
-   			printf("%.2f %.2f %.2f\n", globalHomo.at<float>(2, 0), globalHomo.at<float>(2, 1), globalHomo.at<float>(2, 2));
-   			printf("==========================\n");
-   			/*
-   			for(int j = 0; j < match_mask.size(); j++)
-   			{
-   				printf("%.2f, ", norm(warp_pts[matches[j].trainIdx] - now_pts[matches[j].queryIdx]));
-   			}
-   			printf("\n");
-   			*/
-
-   			printf("sizeof match_mask = %d\n", match_mask.size());
-   			for (int j = 0; j < match_mask.size(); j++)
-   				if (match_mask[j] == 1)
-   					ransac_matches.push_back(matches[j]);
-   			printf("total ransac_matches = %d\n", ransac_matches.size());
-   			allmatch.push_back(ransac_matches);
+			printf("Computing %d and %d frame Homographies\n", i, i+1);	
 
 			asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
-			asap.SetControlPts(keypoints1, keypoints2, allmatch[i]);
+			asap.SetControlPts(vec_now_pts[i], vec_next_pts[i]);
 			asap.Solve();
 			asap.PrintVertex();		
 			
 			// to get homographies for each cell of each frame
-			Mat homo = Mat::zeros(cut, cut, CV_64FC(9));
+			Mat homo = Mat::zeros(cut, cut, CV_32FC(9));
 			asap.CalcHomos(homo);
 			VecHomo.push_back(homo);
 
-			Mat img_matches;
-    		drawMatches(Mat(frames[i]), keypoints1, Mat(frames[i+1]), keypoints2, allmatch[i], img_matches);
-    		VecImg.push_back(img_matches);
+		//	Mat img_matches;
+    	//	drawMatches(Mat(frames[i]), keypoints1, Mat(frames[i+1]), keypoints2, allmatch[i], img_matches);
+    	//	VecImg.push_back(img_matches);
 		}
 
+		vector<Mat> Vec;
+		Mat homo = Mat::zeros(3, 3, CV_32FC1);
+		homo.at<float>(0, 0) = 1.f;
+		homo.at<float>(1, 1) = 1.f;
+		homo.at<float>(2, 2) = 1.f;
+		for (int i = 0; i < VecHomo.size(); i++)
+	//	for (int i = 0; i < 11; i++)
+		{
+			printf("Compute path at time %d\n", i);	
+			Vec9f tmp = VecHomo[i].at<Vec9f>(0, 0);
+			Mat homo_now = Mat::zeros(3, 3, CV_32FC1);
+			homo_now.at<float>(0, 0) = tmp[0];
+			homo_now.at<float>(0, 1) = tmp[1];
+			homo_now.at<float>(0, 2) = tmp[2];
+			homo_now.at<float>(1, 0) = tmp[3];
+			homo_now.at<float>(1, 1) = tmp[4];
+			homo_now.at<float>(1, 2) = tmp[5];
+			homo_now.at<float>(2, 0) = tmp[6];
+			homo_now.at<float>(2, 1) = tmp[7];
+			homo_now.at<float>(2, 2) = tmp[8];
+			homo = homo * homo_now;
+
+			cout << i << " path" << endl;
+			cout << homo << endl;
+		}
+
+		/*
 		imwrite("match_00.png", VecImg[0]);
 		imwrite("match_01.png", VecImg[1]);
 		imwrite("match_02.png", VecImg[2]);
@@ -186,6 +209,7 @@ int main(int argc, const char **argv)
 		imwrite("frame_08.png", frames[8]);
 		imwrite("frame_09.png", frames[9]);
 		imwrite("frame_10.png", frames[10]);
+		*/
 
 		// bundled camera path
 
@@ -200,9 +224,8 @@ int main(int argc, const char **argv)
     return 0;
 }
 
-void matches2points(const vector<KeyPoint>& train, const vector<KeyPoint>& query,
-        const vector<DMatch>& matches, vector<Point2f>& pts_train,
-        vector<Point2f>& pts_query)
+void matches2points(const vector<KeyPoint>& query, const vector<KeyPoint>& train, 
+        const vector<DMatch>& matches, vector<Point2f>& pts_query, vector<Point2f>& pts_train)
     {
 
         pts_train.clear();
@@ -214,11 +237,12 @@ void matches2points(const vector<KeyPoint>& train, const vector<KeyPoint>& query
 
         for (; i < matches.size(); i++)
         {
-
             const DMatch & dmatch = matches[i];
+            Point2f q = query[dmatch.queryIdx].pt;
+            Point2f t = train[dmatch.trainIdx].pt;
 
-            pts_query.push_back(query[dmatch.queryIdx].pt);
-            pts_train.push_back(train[dmatch.trainIdx].pt);
+            pts_query.push_back(q);
+            pts_train.push_back(t);
 
         }
 
