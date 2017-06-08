@@ -44,7 +44,7 @@ void asapWarp::SetControlPts(vector<Point2f> prevPts, vector<Point2f> nowPts)
 	Mat allConstraints = Mat::zeros(num_smooth_cons + num_data_cons, columns, CV_32FC1);
 	Constraints.copyTo(allConstraints(Rect(0, 0, Constraints.cols, Constraints.rows)));
 	Constraints = allConstraints;
-
+	
 	Constants = Mat::zeros(num_smooth_cons + num_data_cons, 1, CV_32FC1);
 
 	int ind_x, ind_y;

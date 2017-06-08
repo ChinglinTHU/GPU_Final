@@ -23,17 +23,21 @@ public:
 	~allPath();
     void setHomo(int i, int j, int t, Mat p);
     void setHomo(int i, int j, int t, Vec9f p);
+    Mat getWarpHomo(int i, int j, int t);
     void setPath(int i, int j, Path p);
 	Path getPath(int i, int j);
     Path getOptimizedPath(int i, int j);
     void computePath();
     void optimizePath(int iter);
+    void computeWarp();
     
     int height, width, time; // mesh height,mesh width
 
-private:
     vector<vector<Path> > optPath;
     vector<vector<Path> > tmpPath;
-	vector<vector<Path> > cellPath;
+    vector<vector<Path> > cellPath;
     vector<vector<Path> > cellHomo;
+    vector<vector<Path> > warpHomo;
+private:
+    
 };

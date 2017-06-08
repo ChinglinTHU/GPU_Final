@@ -28,6 +28,8 @@ public:
     void PrintConstraints(bool all);
     void PrintVertex();
 
+    Point2f compute_pos(int i, int j);
+    
     Mat Constraints;
     Mat Constants;
 
@@ -63,7 +65,7 @@ private:
 
 	// void quadWarp(cv::Mat im, Quad q1, Quad q2);
 	// compute position by index
-	Point2f compute_pos(int i, int j);
+	
 	Point2f compute_uv(const Point2f V1, const Point2f V2, const Point2f V3);
 	int index_x(int i, int j);
 	int index_y(int i, int j);

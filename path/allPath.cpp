@@ -21,28 +21,35 @@ allPath::allPath(int height, int width, int t)
 
 	vector<vector<Path> > cellPath(width, vector<Path> (height));
 	vector<vector<Path> > cellHomo(width, vector<Path> (height));
+	vector<vector<Path> > warpHomo(width, vector<Path> (height));
 	vector<vector<Path> > optPath(width, vector<Path> (height));
 	vector<vector<Path> > tmpPath(width, vector<Path> (height));
 
 	for (int i = 0; i < width; i++)
 		for (int j = 0; j < height; j++)
 		{
+			warpHomo[i][j] = vector<Mat>(this->time);
 			optPath[i][j] = vector<Mat>(this->time);
 			tmpPath[i][j] = vector<Mat>(this->time);
 			cellPath[i][j] = vector<Mat>(this->time);
 			cellHomo[i][j] = vector<Mat>(this->time-1);
+			
 			for (int t = 0; t < this->time; t++)
 			{
+				warpHomo[i][j][t] = Mat::eye(3, 3, CV_32FC1);
 				cellPath[i][j][t] = Mat::eye(3, 3, CV_32FC1);
 				optPath[i][j][t] = Mat::eye(3, 3, CV_32FC1);
 				tmpPath[i][j][t] = Mat::eye(3, 3, CV_32FC1);
 				if (t < this->time-1)
-					cellHomo[i][j][t] = Mat::eye(3, 3, CV_32FC1);
+				{
+					cellHomo[i][j][t] = Mat::eye(3, 3, CV_32FC1);	
+				}
 			}
 		}
 
 	this->cellPath = cellPath;
 	this->cellHomo = cellHomo;
+	this->warpHomo = warpHomo;
 	this->optPath = optPath;
 	this->tmpPath = tmpPath;
 }
@@ -97,11 +104,26 @@ void allPath::computePath()
 
 }
 
+void allPath::computeWarp()
+{
+	for (int i = 0; i < width; i++)
+		for (int j = 0; j < height; j++)
+			for (int t = 0; t < time; t++)
+				warpHomo[i][j][t] = cellPath[i][j][t].inv(DECOMP_SVD)*optPath[i][j][t];
+		
+
+}
+
+Mat allPath::getWarpHomo(int i, int j, int t)
+{
+	if (i >= width || j >= height || t >= time || i < 0 || j < 0 || t < 0)
+		throw runtime_error("allPath::getWarpHomo: index can only inside the cell.\n");
+	return warpHomo[i][j][t];
+}
+
 Path allPath::getPath(int i, int j)
 {
-	if (i >= width || j >= height || i < 0 || j < 0)
-		throw runtime_error("allPath::getPath: index can only inside the cell.\n");
-	return cellPath[i][j];
+	
 }
 
 Path allPath::getOptimizedPath(int i, int j)
@@ -113,7 +135,7 @@ Path allPath::getOptimizedPath(int i, int j)
 
 void allPath::optimizePath(int iter)
 {
-	float w = .5f;
+	float w = .3f;
 
 	printf("Optimizing path: \n");
 	for (int k = 0; k < iter; k++)

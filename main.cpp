@@ -15,6 +15,8 @@
 #include "opencv2/calib3d.hpp"
 #include "opencv2/opencv_modules.hpp"
 
+#include "opencv2/stitching/detail/blenders.hpp"
+
 #include "./mesh/asapWarp.h"
 #include "./path/allPath.h"
 #include "./utils/Timer.h"
@@ -29,6 +31,7 @@ using namespace std;
 using namespace cv;
 using namespace cv::videostab;
 using namespace cv::cuda;
+using namespace cv::detail;
 
 typedef Vec<float, 9> Vec9f;
 typedef Vec<double, 9> Vec9d;
@@ -87,8 +90,8 @@ int main(int argc, const char **argv)
 		surf.hessianThreshold = 5000;
 		Timer timer_count;
 		timer_count.Start();
-		for (int i = 0; i < gray_frames.size(); i++)
-	//	for (int i = 0; i < 100; i++)
+	//	for (int i = 0; i < gray_frames.size(); i++)
+		for (int i = 0; i < 50; i++)
 		{
 			printf("Computing %d frame feature\n", i);
 			GpuMat cuda_frame;
@@ -138,22 +141,21 @@ int main(int argc, const char **argv)
 		double weight = 1;
 		
 		vector<Mat> VecHomo;
-	//	vector<Mat> VecImg;
-    	for (int i = 0; i < vec_now_pts.size(); i++)
+		for (int i = 0; i < vec_now_pts.size(); i++)
 	//	for (int i = 0; i < 40; i++)
 		{
+			asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
 			printf("Computing %d and %d frame Homographies\n", i, i+1);	
 
-			asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
 			asap.SetControlPts(vec_now_pts[i], vec_next_pts[i]);
 			asap.Solve();
 			// asap.PrintVertex();		
-			
+
 			// to get homographies for each cell of each frame
 			Mat homo = Mat::zeros(cut, cut, CV_32FC(9));
 			asap.CalcHomos(homo);
 			VecHomo.push_back(homo);
-
+			
 		}
 
 		// Compute bundled camera path
@@ -161,7 +163,6 @@ int main(int argc, const char **argv)
 		allPath allpath = allPath(cut, cut, VecHomo.size()+1);
 		Mat homo = Mat::eye(3, 3, CV_32FC1);
 		for (int t = 0; t < VecHomo.size(); t++)
-	//	for (int i = 0; i < 11; i++)
 		{
 			printf("Compute bundled camera path at time %d\n", t);	
 			for (int i = 0; i < cut; i++)
@@ -174,51 +175,110 @@ int main(int argc, const char **argv)
 		}
 		allpath.computePath();
 		allpath.optimizePath(20);
+		allpath.computeWarp();
 
 		vector<Mat> path = allpath.getPath(7, 7);
 		vector<Mat> optpath = allpath.getOptimizedPath(7, 7);
-		for (int i = 0; i < path.size(); i++)
-		{	
-			//cout << "test path: " << i << endl;
-			//cout << path[i] << endl;
-			//cout << optpath[i] << endl;
-		}
-
 		Mat picture(1000, 1000, CV_8UC3, Scalar(255,255,255));  
 		vector<Point2f> center(1);
 		vector<Point2f> move(1);
 		vector<Point2f> stable(1);
 		vector<Point2f> tmp(1);
 
+		/*
 		float scale = 1.f;
-		Point2f offset1(300.f, 450.f);
-		Point2f offset2(300.f, 450.f);
+		Point2f offset(600.f, 700.f);
 		for (int i = 0; i < path.size(); i++)
 		{
+			cerr << path.size() << " = pathsize" << endl;
+			cerr << "i " << i << endl;
 			if (i == 0)
 			{
 				center[0] = Point2f(10.f, 10.f);
-				move[0]   = scale*center[0] + offset2;
-				stable[0] = scale*center[0] + offset1;
+				move[0]   = scale*center[0] + offset;
+				stable[0] = scale*center[0] + offset;
 			}
 			else
 			{
+				cerr << "a" << endl;
 				tmp[0] = move[0];
 				perspectiveTransform(center, move, path[i]);
-				move[0] = move[0]*scale + offset2;
+				cerr << "b" << endl;
+				move[0] = move[0]*scale + offset;
 				arrowedLine(picture, tmp[0], move[0], Scalar(255,0,0));  // blue 
+				cerr << "c" << endl;
 				tmp[0] = stable[0];
 				perspectiveTransform(center, stable, optpath[i]);
-				stable[0] = stable[0]*scale + offset1;
+				stable[0] = stable[0]*scale + offset;
 				arrowedLine(picture, tmp[0], stable[0], Scalar(0,0,255));  // red
 			}
 		}
-		namedWindow("Display window", WINDOW_AUTOSIZE);
-		imshow("Display window", picture );
-		waitKey(0);
-
+		cerr << "4 " << endl;
 		imwrite("optimize_path.png", picture);
+		*/
+		//namedWindow("Display window", WINDOW_AUTOSIZE);
+		//imshow("Display window", picture );
+		//waitKey(0);
 
+		
+
+		// Warp image
+		vector<Mat> warp_frames;
+		printf("Image Synthesis ...\n");
+		asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
+		for (int t = 0; t < min(50, allpath.time); t++)
+		{
+			cerr << "t: " << t << endl;
+			Ptr<Blender> blender;
+			blender = Blender::createDefault(Blender::FEATHER, true);
+			FeatherBlender* fb = dynamic_cast<FeatherBlender*>(blender.get());
+			fb->prepare(Rect(0, 0, width, height));
+
+			Mat frame = frames[t];
+			frame.convertTo(frame, CV_16SC3);
+			for (int i = 0; i < cut; i++)
+				for (int j = 0; j < cut; j++)
+				{
+					Mat warp_frame, mask, warp_mask, h;
+					h = allpath.getWarpHomo(i, j, t);
+
+					mask = Mat::zeros(frame.size(), CV_8U);
+					mask(Rect(asap.compute_pos(i, j), asap.compute_pos(i+1, j+1))).setTo(Scalar::all(255));
+
+					warpPerspective(frame, warp_frame, h, frame.size());
+					warpPerspective(mask, warp_mask, h, mask.size());
+
+					//fb->feed(warp_frame.clone(), warp_mask.clone(), Point(0, 0));
+					fb->feed(warp_frame, warp_mask, Point(0, 0));
+				}
+
+			Mat warp_frame;
+			Mat mask = Mat::zeros(frame.size(), CV_8U);
+			mask.setTo(Scalar::all(255));
+			fb->blend(warp_frame, mask);
+			warp_frame.convertTo(warp_frame, CV_8UC3);
+			warp_frames.push_back(warp_frame);
+		}
+
+
+		// float blend_strength = 5.f;
+		// Size dst_sz = resultRoi(corners, sizes).size();
+
+		//blender->prepare(corners, sizes);
+		// float blend_width = sqrt(static_cast<float>(dst_sz.area())) * blend_strength / 100.f;
+		// fb->setSharpness(1.f/blend_width);
+
+
+		for (int i = 8; i < warp_frames.size(); i++)
+		{
+			char str[20];
+			Mat frame_warp = Mat::zeros(frames[i].rows + warp_frames[i].rows, frames[i].cols, CV_8UC3);
+			frames[i].copyTo(frame_warp(Rect(0, 0, frames[i].cols, frames[i].rows)));
+			warp_frames[i].copyTo(frame_warp(Rect(0, frames[i].rows, warp_frames[i].cols, warp_frames[i].rows)));
+
+			sprintf(str, "frame_warp_%03d.png", i);
+			imwrite(str, frame_warp);
+		}
 		/*
 		imwrite("match_00.png", VecImg[0]);
 		imwrite("match_01.png", VecImg[1]);
@@ -231,22 +291,8 @@ int main(int argc, const char **argv)
 		imwrite("match_08.png", VecImg[8]);
 		imwrite("match_09.png", VecImg[9]);
 		imwrite("match_10.png", VecImg[10]);
-		imwrite("frame_00.png", frames[0]);
-		imwrite("frame_01.png", frames[1]);
-		imwrite("frame_02.png", frames[2]);
-		imwrite("frame_03.png", frames[3]);
-		imwrite("frame_04.png", frames[4]);
-		imwrite("frame_05.png", frames[5]);
-		imwrite("frame_06.png", frames[6]);
-		imwrite("frame_07.png", frames[7]);
-		imwrite("frame_08.png", frames[8]);
-		imwrite("frame_09.png", frames[9]);
-		imwrite("frame_10.png", frames[10]);
 		*/
 
-		// bundled camera path
-
-		// path optimization
 	}
 	catch (const exception &e)
 	{
@@ -280,3 +326,5 @@ void matches2points(const vector<KeyPoint>& query, const vector<KeyPoint>& train
         }
 
     }
+
+
