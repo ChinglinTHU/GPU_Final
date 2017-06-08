@@ -90,8 +90,8 @@ int main(int argc, const char **argv)
 		surf.hessianThreshold = 5000;
 		Timer timer_count;
 		timer_count.Start();
-	//	for (int i = 0; i < gray_frames.size(); i++)
-		for (int i = 0; i < 50; i++)
+		for (int i = 0; i < gray_frames.size(); i++)
+	//	for (int i = 0; i < 20; i++)
 		{
 			printf("Computing %d frame feature\n", i);
 			GpuMat cuda_frame;
@@ -142,7 +142,6 @@ int main(int argc, const char **argv)
 		
 		vector<Mat> VecHomo;
 		for (int i = 0; i < vec_now_pts.size(); i++)
-	//	for (int i = 0; i < 40; i++)
 		{
 			asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
 			printf("Computing %d and %d frame Homographies\n", i, i+1);	
@@ -185,12 +184,14 @@ int main(int argc, const char **argv)
 		vector<Point2f> stable(1);
 		vector<Point2f> tmp(1);
 
-		/*
+		
 		float scale = 1.f;
-		Point2f offset(600.f, 700.f);
+		Point2f offset(500.f, 500.f);
+
+		cerr << path.size() << " = pathsize" << endl;
 		for (int i = 0; i < path.size(); i++)
 		{
-			cerr << path.size() << " = pathsize" << endl;
+			
 			cerr << "i " << i << endl;
 			if (i == 0)
 			{
@@ -200,22 +201,18 @@ int main(int argc, const char **argv)
 			}
 			else
 			{
-				cerr << "a" << endl;
 				tmp[0] = move[0];
 				perspectiveTransform(center, move, path[i]);
-				cerr << "b" << endl;
 				move[0] = move[0]*scale + offset;
 				arrowedLine(picture, tmp[0], move[0], Scalar(255,0,0));  // blue 
-				cerr << "c" << endl;
 				tmp[0] = stable[0];
 				perspectiveTransform(center, stable, optpath[i]);
 				stable[0] = stable[0]*scale + offset;
 				arrowedLine(picture, tmp[0], stable[0], Scalar(0,0,255));  // red
 			}
 		}
-		cerr << "4 " << endl;
 		imwrite("optimize_path.png", picture);
-		*/
+		
 		//namedWindow("Display window", WINDOW_AUTOSIZE);
 		//imshow("Display window", picture );
 		//waitKey(0);
@@ -226,7 +223,7 @@ int main(int argc, const char **argv)
 		vector<Mat> warp_frames;
 		printf("Image Synthesis ...\n");
 		asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
-		for (int t = 0; t < min(50, allpath.time); t++)
+		for (int t = 0; t < min(1000, allpath.time); t++)
 		{
 			cerr << "t: " << t << endl;
 			Ptr<Blender> blender;
@@ -240,7 +237,8 @@ int main(int argc, const char **argv)
 				for (int j = 0; j < cut; j++)
 				{
 					Mat warp_frame, mask, warp_mask, h;
-					h = allpath.getWarpHomo(i, j, t);
+					// h = allpath.getWarpHomo(i, j, t);
+					h = allpath.getPath(i, j, t).inv();
 
 					mask = Mat::zeros(frame.size(), CV_8U);
 					mask(Rect(asap.compute_pos(i, j), asap.compute_pos(i+1, j+1))).setTo(Scalar::all(255));
@@ -259,15 +257,6 @@ int main(int argc, const char **argv)
 			warp_frame.convertTo(warp_frame, CV_8UC3);
 			warp_frames.push_back(warp_frame);
 		}
-
-
-		// float blend_strength = 5.f;
-		// Size dst_sz = resultRoi(corners, sizes).size();
-
-		//blender->prepare(corners, sizes);
-		// float blend_width = sqrt(static_cast<float>(dst_sz.area())) * blend_strength / 100.f;
-		// fb->setSharpness(1.f/blend_width);
-
 
 		for (int i = 8; i < warp_frames.size(); i++)
 		{

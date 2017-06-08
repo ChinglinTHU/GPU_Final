@@ -26,6 +26,7 @@ public:
     Mat getWarpHomo(int i, int j, int t);
     void setPath(int i, int j, Path p);
 	Path getPath(int i, int j);
+    Mat getPath(int i, int j, int t);
     Path getOptimizedPath(int i, int j);
     void computePath();
     void optimizePath(int iter);

@@ -121,9 +121,17 @@ Mat allPath::getWarpHomo(int i, int j, int t)
 	return warpHomo[i][j][t];
 }
 
+Mat allPath::getPath(int i, int j, int t)
+{
+	if (i >= width || j >= height || t >= time || i < 0 || j < 0 || t < 0)
+		throw runtime_error("allPath::getWarpHomo: index can only inside the cell.\n");
+	return cellPath[i][j][t];
+}
 Path allPath::getPath(int i, int j)
 {
-	
+	if (i >= width || j >= height || i < 0 || j < 0)
+		throw runtime_error("allPath::getPath: index can only inside the cell.\n");
+	return cellPath[i][j];
 }
 
 Path allPath::getOptimizedPath(int i, int j)
