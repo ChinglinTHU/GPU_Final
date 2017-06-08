@@ -28,7 +28,8 @@ public:
     Path getOptimizedPath(int i, int j);
     void computePath();
     void optimizePath(int iter);
-    
+    void jacobiSolver(int iter=20);
+
     int height, width, time; // mesh height,mesh width
 
 private:

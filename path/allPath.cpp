@@ -11,6 +11,7 @@ typedef vector<Mat> Path;
 
 #define PI 3.1415926f
 #define gaussian(x, mean, var) exp(-((x-mean)/var)*((x-mean)/var)/2.f)/(var*sqrt(2*PI))
+#define gaussianD(dis, var) exp(-(dis/var)*(dis/var)/2.f)/(var*sqrt(2*PI))
 
 allPath::allPath(int height, int width, int t)
 {
@@ -89,9 +90,10 @@ void allPath::computePath()
 			cellPath[i][j][0] = Mat::eye(3, 3, CV_32FC1);
 			for (int t = 1; t < time; t++)
 			{
-				cellPath[i][j][t] = cellPath[i][j][t-1] * cellHomo[i][j][t-1];
+				cellPath[i][j][t] = cellHomo[i][j][t-1] * cellPath[i][j][t-1];// * cellHomo[i][j][t-1];
 				optPath[i][j][t] = cellPath[i][j][t];
 				tmpPath[i][j][t] = cellPath[i][j][t];
+				// cout<<cellPath[i][j][t]<<endl;
 			}
 		}
 
@@ -156,4 +158,111 @@ void allPath::optimizePath(int iter)
 		}
 	}
 }
-    
+
+// use jacobi solver to optimize path
+void allPath::jacobiSolver(int iter)
+{
+	float lambda = 5.0; // TODO: need to optimize
+	float cellsize = height*width;
+	for(int it = 0; it < iter; it++)
+	{
+		cout<<"iter time:"<<it+1<<endl;
+		for(int t = 0; t < time; t++)
+		{
+			int sta_t, end_t;
+			sta_t = t-30 < 0 ? 0 : t-30;
+			end_t = t+30 > time-1 ? time-1 : t+30;
+			int num_omega = end_t - sta_t + 1;
+			float w[num_omega] = {0.0};
+			float w_sum = 0.0;
+
+			// calc weights
+			for (int r = sta_t; r <= end_t; r++)
+			{
+				if(r == t)
+				{
+					w[r-sta_t] = 0;
+					continue;
+				}
+				float trans =0.f;
+				for (int i = 0; i < height; i++)
+					for (int j = 0; j < width; j++)
+					{
+						float u = cellPath[i][j][r].at<float>(0,2) - cellPath[i][j][t].at<float>(0,2);
+						float v = cellPath[i][j][r].at<float>(1,2) - cellPath[i][j][t].at<float>(1,2);
+						trans += abs(u) + abs(v);
+						// cout<<u<<","<<v<<endl;
+					}
+				trans = trans / cellsize;
+				// cout<<"trans = "<<trans<<endl;
+				w[r-sta_t] = gaussianD(float(r-t), 10.f)*gaussianD(trans, 10.f);
+				w_sum += w[r-sta_t];
+			}
+
+			// each cell
+			for (int i = 0; i < height; i++)
+				for (int j = 0; j < width; j++)
+				{
+					// 1st cons
+					tmpPath[i][j][t] = cellPath[i][j][t].clone();
+					// 2nd cons
+					for (int r = sta_t; r <= end_t; r++)
+					{
+						tmpPath[i][j][t] += 2*lambda*w[r-sta_t]*optPath[i][j][r];
+					}
+					//3rd cons
+					int N = 0;
+						if(i>0 && j>0)
+						{
+							N++;
+							tmpPath[i][j][t] += 2*optPath[i-1][j-1][t];
+						}
+						if(i>0)
+						{
+							N++;
+							tmpPath[i][j][t] += 2*optPath[i-1][j][t];
+						}
+						if(i>0 && j<width-1)
+						{
+							N++;
+							tmpPath[i][j][t] += 2*optPath[i-1][j+1][t];
+						}
+						if(j>0)
+						{
+							N++;
+							tmpPath[i][j][t] += 2*optPath[i][j-1][t];
+						}
+						if(j<width-1)
+						{
+							N++;
+							tmpPath[i][j][t] += 2*optPath[i][j+1][t];
+						}
+						if(i<height-1 && j>0)
+						{
+							N++;
+							tmpPath[i][j][t] += 2*optPath[i+1][j-1][t];
+						}
+						if(i<height-1)
+						{
+							N++;
+							tmpPath[i][j][t] += 2*optPath[i+1][j][t];
+						}
+						if(i<height-1 && j<width-1)
+						{
+							N++;
+							tmpPath[i][j][t] += 2*optPath[i+1][j+1][t];
+						}
+					float gamma = 2*lambda*w_sum+2*N-1;
+					tmpPath[i][j][t] = tmpPath[i][j][t]/gamma;
+				}
+		}
+		// need deep copy here again
+		for(int t = 0;t<time;t++)
+			for(int i = 0;i<height;i++)
+				for(int j = 0;j<width;j++)
+				{
+					optPath[i][j][t] = tmpPath[i][j][t].clone();
+				}
+		// optPath = tmpPath.clone();
+	}
+}

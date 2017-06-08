@@ -173,15 +173,16 @@ int main(int argc, const char **argv)
 
 		}
 		allpath.computePath();
-		allpath.optimizePath(20);
+		// allpath.optimizePath(20);
+		allpath.jacobiSolver();
 
 		vector<Mat> path = allpath.getPath(7, 7);
 		vector<Mat> optpath = allpath.getOptimizedPath(7, 7);
 		for (int i = 0; i < path.size(); i++)
 		{	
-			//cout << "test path: " << i << endl;
-			//cout << path[i] << endl;
-			//cout << optpath[i] << endl;
+			cout << "test path: " << i << endl;
+			cout << path[i] << endl;
+			// cout << optpath[i] << endl;
 		}
 
 		Mat picture(1000, 1000, CV_8UC3, Scalar(255,255,255));  
@@ -206,7 +207,7 @@ int main(int argc, const char **argv)
 				tmp[0] = move[0];
 				perspectiveTransform(center, move, path[i]);
 				move[0] = move[0]*scale + offset2;
-				arrowedLine(picture, tmp[0], move[0], Scalar(255,0,0));  // blue 
+				arrowedLine(picture, tmp[0], move[0], Scalar(255,0,0));  // blue
 				tmp[0] = stable[0];
 				perspectiveTransform(center, stable, optpath[i]);
 				stable[0] = stable[0]*scale + offset1;
