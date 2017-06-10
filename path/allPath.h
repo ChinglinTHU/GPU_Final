@@ -29,6 +29,11 @@ public:
     void computePath();
     void optimizePath(int iter);
     void jacobiSolver(int iter=20);
+    void computeBPath();
+    vector<Path> getcellPath(int t);
+    vector<Path> gethomoPath(int t);
+    vector<Path> getoptPath(int t);
+    vector<Path> getbPath(int t);
 
     int height, width, time; // mesh height,mesh width
 
@@ -37,4 +42,5 @@ private:
     vector<vector<Path> > tmpPath;
 	vector<vector<Path> > cellPath;
     vector<vector<Path> > cellHomo;
+    vector<vector<Path> > BPath;
 };

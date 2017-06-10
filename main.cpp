@@ -44,6 +44,8 @@ void matches2points(const vector<KeyPoint>& train, const vector<KeyPoint>& query
         const std::vector<cv::DMatch>& matches, std::vector<cv::Point2f>& pts_train,
         std::vector<Point2f>& pts_query);
 
+void getWarpedImg(Mat output, Mat input, vector<vector<Mat>> bundledHomo, int width, int height);
+
 int main(int argc, const char **argv)
 {
 	try
@@ -137,51 +139,115 @@ int main(int argc, const char **argv)
 		int cut = 2*2*2;
 		double weight = 1;
 		
-		vector<Mat> VecHomo;
-	//	vector<Mat> VecImg;
-    	for (int i = 0; i < vec_now_pts.size(); i++)
-	//	for (int i = 0; i < 40; i++)
-		{
-			printf("Computing %d and %d frame Homographies\n", i, i+1);	
+	// 	vector<Mat> VecHomo;
+	// //	vector<Mat> VecImg;
+ //    	for (int i = 0; i < vec_now_pts.size(); i++)
+	// //	for (int i = 0; i < 40; i++)
+	// 	{
+	// 		printf("Computing %d and %d frame Homographies\n", i, i+1);	
 
-			asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
-			asap.SetControlPts(vec_now_pts[i], vec_next_pts[i]);
-			asap.Solve();
-			// asap.PrintVertex();		
+	// 		asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
+	// 		asap.SetControlPts(vec_now_pts[i], vec_next_pts[i]);
+	// 		asap.Solve();
+	// 		// asap.PrintVertex();		
 			
-			// to get homographies for each cell of each frame
-			Mat homo = Mat::zeros(cut, cut, CV_32FC(9));
-			asap.CalcHomos(homo);
-			VecHomo.push_back(homo);
+	// 		// to get homographies for each cell of each frame
+	// 		Mat homo = Mat::zeros(cut, cut, CV_32FC(9));
+	// 		asap.CalcHomos(homo);
+	// 		VecHomo.push_back(homo);
 
-		}
+	// 	}
 
-		// Compute bundled camera path
-		vector<Mat> Vec;
-		allPath allpath = allPath(cut, cut, VecHomo.size()+1);
-		Mat homo = Mat::eye(3, 3, CV_32FC1);
-		for (int t = 0; t < VecHomo.size(); t++)
-	//	for (int i = 0; i < 11; i++)
+	// 	// Compute bundled camera path
+	// 	vector<Mat> Vec;
+	// 	allPath allpath = allPath(cut, cut, VecHomo.size()+1);
+	// 	Mat homo = Mat::eye(3, 3, CV_32FC1);
+	// 	for (int t = 0; t < VecHomo.size(); t++)
+	// //	for (int i = 0; i < 11; i++)
+	// 	{
+	// 		printf("Compute bundled camera path at time %d\n", t);	
+	// 		for (int i = 0; i < cut; i++)
+	// 			for (int j = 0; j < cut; j++)
+	// 			{
+	// 				Vec9f tmp = VecHomo[t].at<Vec9f>(i, j);
+	// 				allpath.setHomo(i, j, t, tmp);
+	// 			}
+
+	// 	}
+	// 	allpath.computePath();
+	// 	// allpath.optimizePath(20);
+	// 	allpath.jacobiSolver();
+
+		allPath onepath = allPath(1, 1, gray_frames.size());
+		Vec9f otmp;
+			otmp[0] = 1.f;otmp[1] = 0.f;otmp[2] = 0.f;
+			otmp[3] = 0.f;otmp[4] = 1.f;otmp[5] = 0.f;
+			otmp[6] = 0.f;otmp[7] = 0.f;otmp[8] = 1.f;
+		onepath.setHomo(0, 0, 0, otmp);
+		for (int i = 0; i < vec_global_homo.size(); i++)
 		{
-			printf("Compute bundled camera path at time %d\n", t);	
-			for (int i = 0; i < cut; i++)
-				for (int j = 0; j < cut; j++)
-				{
-					Vec9f tmp = VecHomo[t].at<Vec9f>(i, j);
-					allpath.setHomo(i, j, t, tmp);
-				}
-
+			Mat homo_tmp = vec_global_homo[i];
+			otmp[0] = homo_tmp.at<double>(0,0);otmp[1] = homo_tmp.at<double>(0,1);otmp[2] = homo_tmp.at<double>(0,2);
+			otmp[3] = homo_tmp.at<double>(1,0);otmp[4] = homo_tmp.at<double>(1,1);otmp[5] = homo_tmp.at<double>(1,2);
+			otmp[6] = homo_tmp.at<double>(2,0);otmp[7] = homo_tmp.at<double>(2,1);otmp[8] = homo_tmp.at<double>(2,2);
+			onepath.setHomo(0, 0, i, otmp);
 		}
-		allpath.computePath();
-		// allpath.optimizePath(20);
-		allpath.jacobiSolver();
+		onepath.computePath();
+		// onepath.optimizePath(20);
+		onepath.jacobiSolver();
+		
+		// vector<Mat> path = allpath.getPath(7, 7);
+		// vector<Mat> optpath = allpath.getOptimizedPath(7, 7);
+		vector<Mat> path = onepath.getPath(0, 0);
+		vector<Mat> optpath = onepath.getOptimizedPath(0, 0);
 
-		vector<Mat> path = allpath.getPath(7, 7);
-		vector<Mat> optpath = allpath.getOptimizedPath(7, 7);
+		// vector<Path> test = allpath.gethomoPath(240);
+		// for (int i = 0; i<cut;i++)
+		// 	for(int j = 0;j<cut; j++)
+		// 	{
+		// 		cout<<test[i][j]<<endl;
+		// 	}
+
+		// Mat input, output;
+		// vector<Path> bundledHomo;
+		// for(int i = 0; i<240; i++)
+		// {
+		// 	cout<<"warp the "<<i<<"th img."<<endl;
+		// 	input = gray_frames[i];
+		// 	bundledHomo = allpath.gethomoPath(i);
+		// 	// getWarpedImg(output, input, bundledHomo, cut, cut);
+		// 	output = Mat::zeros(input.rows, input.cols, input.type());
+		// 	int cellHeight = input.rows / cut;
+		// 	int cellWidth = input.cols / cut;
+
+		// 	for(int r = 0; r<input.rows; r++)
+		// 		for(int c = 0; c<input.cols; c++)
+		// 		{
+		// 	// cout<<"[c,r]"<<"["<<c<<","<<r<<"]"<<endl;
+		// 			int i = c / cellWidth;
+		// 			int j = r / cellHeight;
+		// 	// cout<<"[i,j]"<<"["<<i<<","<<j<<"]"<<endl;
+		// 			vector<Point2f> ori;ori.push_back(Point2f(c, r));
+		// 			vector<Point2f> tar(1);tar.push_back(Point2f(0, 0));
+		// 			perspectiveTransform(ori, tar, bundledHomo[i][j]);
+		// 	// cout<<"[cc,rr]"<<"["<<tar[0].x<<","<<tar[0].y<<"]"<<endl;
+		// 	// cout<<bundledHomo[i][j]<<endl;
+		// 			if(0 <= tar[0].x && tar[0].x < input.cols && 0 <= tar[0].y && tar[0].y < input.rows)
+		// 				// output.at<int>(int(tar[0].y), int(tar[0].x)) = input.at<int>(r, c);
+		// 				output.at<int>(int(tar[0].y+0.5), int(tar[0].x+0.5)) = 255;
+		// 			else
+		// 				cout<<tar[0]<<endl;
+		// 		}
+
+		// 	string dir = "./result/ori/frame";
+		// 	dir += to_string(i);
+		// 	dir += ".png";
+		// 	imwrite(dir, output);
+		// }
 		for (int i = 0; i < path.size(); i++)
 		{	
-			cout << "test path: " << i << endl;
-			cout << path[i] << endl;
+			// cout << "test path: " << i << endl;
+			// cout << path[i] << endl;
 			// cout << optpath[i] << endl;
 		}
 
@@ -219,6 +285,28 @@ int main(int argc, const char **argv)
 		waitKey(0);
 
 		imwrite("optimize_path.png", picture);
+
+		// draw frames after warp
+		for(int i = 0; i < gray_frames.size()-1; i++)
+		{
+			Mat input = gray_frames[i].clone();
+			Mat output = Mat::zeros(input.rows, input.cols, input.type());
+			// warpPerspective(input, output, path[i], output.size());
+			string dir = "./result/ori/frame";
+			dir += to_string(i);
+			dir += ".png";
+			imwrite(dir, input);
+			// warpPerspective(input, output, optpath[i], output.size());
+			// dir = "./result/opt/frame";
+			// dir += to_string(i);
+			// dir += ".png";
+			// imwrite(dir, output);
+			warpPerspective(input, output, optpath[i] * path[i].inv(), output.size());
+			dir = "./result/final/frame";
+			dir += to_string(i);
+			dir += ".png";
+			imwrite(dir, output);
+		}
 
 		/*
 		imwrite("match_00.png", VecImg[0]);
@@ -281,3 +369,29 @@ void matches2points(const vector<KeyPoint>& query, const vector<KeyPoint>& train
         }
 
     }
+
+void getWarpedImg(Mat output, Mat input, vector<vector<Mat>> bundledHomo, int width, int height)
+{
+	output = Mat::zeros(input.rows, input.cols, input.type());
+	int cellHeight = input.rows / height;
+	int cellWidth = input.cols / width;
+
+	for(int r = 0; r<input.rows; r++)
+		for(int c = 0; c<input.cols; c++)
+		{
+			// cout<<"[c,r]"<<"["<<c<<","<<r<<"]"<<endl;
+			int i = c / cellWidth;
+			int j = r / cellHeight;
+			// cout<<"[i,j]"<<"["<<i<<","<<j<<"]"<<endl;
+			vector<Point2f> ori;ori.push_back(Point2f(c, r));
+			vector<Point2f> tar(1);tar.push_back(Point2f(0, 0));
+			perspectiveTransform(ori, tar, bundledHomo[i][j]);
+			// cout<<"[cc,rr]"<<"["<<tar[0].x<<","<<tar[0].y<<"]"<<endl;
+			// cout<<bundledHomo[i][j]<<endl;
+			if(0 <= tar[0].x && tar[0].x < input.cols && 0 <= tar[0].y && tar[0].y < input.rows)
+				output.at<int>(int(tar[0].y), int(tar[0].x)) = input.at<int>(int(ori[0].y), int(ori[0].x));
+		}
+	// namedWindow("Display window", WINDOW_AUTOSIZE);
+	// imshow("Display window", output );
+	// waitKey(0);
+}
