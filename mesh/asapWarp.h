@@ -19,11 +19,11 @@ using namespace cv::cuda;
 class asapWarp
 {
 public:
+    asapWarp();
 	asapWarp(int height, int width, int cellheight, int cellwidth, float weight);
 	~asapWarp();
-	void SetControlPts(vector<Point2f> prevPts, vector<Point2f> nowPts);
+	void SetControlPts(vector<Point2f> prevPts, vector<Point2f> nowPts, Mat globalH);
 	void Solve();
-	Mat Warp(Mat Img, int gap);
 	void CalcHomos(Mat homos);
     void PrintConstraints(bool all);
     void PrintVertex();
@@ -41,8 +41,6 @@ public:
     int rowCount;
     int columns;
     
-    vector<int> x_index;
-    vector<int> y_index;
     
     vector<Point2f> cellPts;
     int allVertexNum;
@@ -53,6 +51,7 @@ public:
     int height,width; // mesh height,mesh width
     int quadWidth,quadHeight; // quadWidth,%quadHeight
     int imgHeight,imgWidth; // imgHeight,imgWidth
+    Mat globalH;
     
     //Mat warpIm;
     //float gap;
