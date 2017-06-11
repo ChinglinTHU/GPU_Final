@@ -125,6 +125,7 @@ int main(int argc, const char **argv)
 	   			// find global & pick out outliers
 	   			// findHomography return mat with double type
 	   			Mat globalHomo = findHomography(now_pts, next_pts, RANSAC, 4, match_mask);
+
 	   			for (int j = match_mask.size() - 1; j >= 0; j--)
 	   				if (match_mask[j] == 0)
 	   				{
@@ -188,8 +189,8 @@ int main(int argc, const char **argv)
 		
 		allpath.computePath();
 
-		allpath.optimizePath(20);
-		// allpath.jacobiSolver();
+		// allpath.optimizePath(20);
+		allpath.jacobiSolver();
 
 		allpath.computeWarp();
 
@@ -201,7 +202,7 @@ int main(int argc, const char **argv)
 		vector<Point2f> stable(1);
 		vector<Point2f> tmp(1);
 		
-		float scale = 1.f;
+		float scale = 2.f;
 		Point2f offset(500.f, 500.f);
 		for (int i = 0; i < path.size(); i++)
 		{
@@ -239,7 +240,7 @@ int main(int argc, const char **argv)
 		warp W(asap);
 		for (int t = 0; t < min(1000, allpath.time); t++)
 		{
-			//if (t != 90)
+			//if (t % 40 != 0)
 			//	continue;
 			
 			printf("Image Synthesis %d \n", t);

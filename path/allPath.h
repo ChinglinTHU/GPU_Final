@@ -36,6 +36,15 @@ public:
     void optimizePath(int iter);
     void jacobiSolver(int iter = 20);
     void computeWarp();
+
+    /* Panda's Code
+    void computeBPath();
+    vector<Path> getcellPath(int t);
+    vector<Path> gethomoPath(int t);
+    vector<Path> getoptPath(int t);
+    vector<Path> getbPath(int t);
+    //*/ 
+
     
     int height, width, time; // mesh height,mesh width
 
@@ -44,6 +53,9 @@ public:
     vector<vector<Path> > cellPath;
     vector<vector<Path> > cellHomo;
     vector<vector<Path> > warpHomo;
+
 private:
-    
+    /* Panda's Code
+    vector<vector<Path> > BPath;
+    */ 
 };
