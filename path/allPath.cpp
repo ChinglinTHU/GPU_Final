@@ -90,10 +90,11 @@ void allPath::computePath()
 	for (int i = 0; i < width; i++)
 		for (int j = 0; j < height; j++)
 		{
-			cellPath[i][j][0] = Mat::eye(3, 3, CV_32FC1);
-			for (int t = 1; t < time; t++)
+			cellPath[i][j][0] = cellHomo[i][j][0];
+			// cellPath[i][j][0] = Mat::eye(3, 3, CV_32FC1);
+			for (int t = 1; t < time-1; t++)
 			{
-				cellPath[i][j][t] = cellHomo[i][j][t-1] * cellPath[i][j][t-1];
+				cellPath[i][j][t] = cellHomo[i][j][t] * cellPath[i][j][t-1];
 				optPath[i][j][t] = cellPath[i][j][t].clone();
 				tmpPath[i][j][t] = cellPath[i][j][t].clone();
 				// cout<<cellPath[i][j][t]<<endl;
@@ -285,9 +286,153 @@ void allPath::jacobiSolver(int iter)
 	}
 }
 
+void allPath::jacobiPointSolver(int iter)
+{
+	float lambda = 5.0; // TODO: need to optimize
+	float cellsize = (height+1)*(width+1);
+	for(int it = 0; it < iter; it++)
+	{
+		cout<<"iter time:"<<it+1<<endl;
+		for(int t = 0; t < time; t++)
+		{
+			int sta_t, end_t;
+			sta_t = t-30 < 0 ? 0 : t-30;
+			end_t = t+30 > time-1 ? time-1 : t+30;
+			int num_omega = end_t - sta_t + 1;
+			float w[num_omega] = {0.0};
+			float w_sum = 0.0;
+
+			// calc weights
+			for (int r = sta_t; r <= end_t; r++)
+			{
+				// if(r == t)
+				// {
+				// 	w[r-sta_t] = 0.0;
+				// 	continue;
+				// }
+				float trans =0.f;
+				for (int i = 0; i <= height; i++)
+					for (int j = 0; j <= width; j++)
+					{
+						trans += abs(cellPoints[i][j][r].x - cellPoints[i][j][t].x) + 
+								abs(cellPoints[i][j][r].y - cellPoints[i][j][t].y);
+					}
+				trans = trans / cellsize;
+				// cout<<"trans = "<<trans<<endl;
+				w[r-sta_t] = 1000*gaussianD(float(r-t), 10.f)*gaussianD(trans, 10.f);
+				// cout<<"w[r] = "<<w[r-sta_t]<<endl;
+				w_sum += w[r-sta_t];
+			}
+
+			// each cell
+			for (int i = 0; i <= width; i++)
+				for (int j = 0; j <= height; j++)
+				{
+					// 1st cons
+					// tmpPath[i][j][t] = cellPath[i][j][t].clone();
+					// 2nd cons
+					Point2f cons2(0,0);
+					for (int r = sta_t; r <= end_t; r++)
+					{
+						// tmpPath[i][j][t] += 2*lambda*w[r-sta_t]*optPath[i][j][r];
+						cons2 += 2*lambda*w[r-sta_t]*optPoints[i][j][r];
+					}
+
+					//3rd cons
+					Point2f cons3(0,0);
+					int N = 0;
+						if(i>0 && j>0)
+						{
+							N++;
+							// tmpPath[i][j][t] += 2*optPath[i-1][j-1][t];
+							cons3 += 2*optPoints[i-1][j-1][t];
+						}
+						if(i>0)
+						{
+							N++;
+							// tmpPath[i][j][t] += 2*optPath[i-1][j][t];
+							cons3 += 2*optPoints[i-1][j][t];
+						}
+						if(i>0 && j<height)
+						{
+							N++;
+							// tmpPath[i][j][t] += 2*optPath[i-1][j+1][t];
+							cons3 += 2*optPoints[i-1][j+1][t];
+						}
+						if(j>0)
+						{
+							N++;
+							// tmpPath[i][j][t] += 2*optPath[i][j-1][t];
+							cons3 += 2*optPoints[i][j-1][t];
+						}
+						if(j<height)
+						{
+							N++;
+							// tmpPath[i][j][t] += 2*optPath[i][j+1][t];
+							cons3 += 2*optPoints[i][j+1][t];
+						}
+						if(i<width && j>0)
+						{
+							N++;
+							// tmpPath[i][j][t] += 2*optPath[i+1][j-1][t];
+							cons3 += 2*optPoints[i+1][j-1][t];
+						}
+						if(i<width)
+						{
+							N++;
+							// tmpPath[i][j][t] += 2*optPath[i+1][j][t];
+							cons3 += 2*optPoints[i+1][j][t];
+						}
+						if(i<width && j<height)
+						{
+							N++;
+							// tmpPath[i][j][t] += 2*optPath[i+1][j+1][t];
+							cons3 += 2*optPoints[i+1][j+1][t];
+						}
+					float gamma = 2*lambda*w_sum+2*N+1;
+					// tmpPath[i][j][t] = tmpPath[i][j][t]/gamma;
+					// cout<<"cellPath:"<<endl<<cellPath[i][j][t]<<endl
+					// <<"cons2:"<<endl<<cons2<<endl
+					// <<"cons3:"<<endl<<cons3<<endl
+					// <<"gamma:"<<gamma<<endl;
+					tmpPoints[i][j][t] = (cellPoints[i][j][t] + cons2 + cons3)/gamma;
+				}
+		}
+		// need deep copy here again
+		// for(int t = 0;t<time;t++)
+		// 	for(int i = 0;i<width;i++)
+		// 		for(int j = 0;j<height;j++)
+		// 		{
+		// 			optPoints[i][j][t] = tmpPoints[i][j][t].clone();
+		// 		}
+		optPoints = tmpPoints;
+	}
+
+	// calc homography for each cell
+	for(int t = 0; t<time;t++)
+		for(int i = 0; i < width; i++)
+			for(int j = 0; j<height;j++)
+			{
+				vector<Point2f> V(4);
+				V[0]=cellPoints[i][j][t];
+				V[1]=cellPoints[i+1][j][t];
+				V[2]=cellPoints[i][j+1][t];
+				V[3]=cellPoints[i+1][j+1][t];
+				vector<Point2f> W(4);
+				W[0]=optPoints[i][j][t];
+				W[1]=optPoints[i+1][j][t];
+				W[2]=optPoints[i][j+1][t];
+				W[3]=optPoints[i+1][j+1][t];
+				BPath[i][j][t] = findHomography(V, W);
+			}
+}
+
 void allPath::computeBPath()
 {
-
+	for(int t = 0;t<time;t++)
+		for(int i = 0;i<width;i++)
+			for(int j = 0;j<height;j++)
+				BPath[i][j][t] = optPath[i][j][t]*cellPath[i][j][t].inv();
 }
 
 vector<Path> allPath::getcellPath(int t)

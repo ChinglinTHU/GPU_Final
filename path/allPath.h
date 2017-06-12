@@ -29,6 +29,7 @@ public:
     void computePath();
     void optimizePath(int iter);
     void jacobiSolver(int iter=20);
+    void jacobiPointSolver(int iter=20);
     void computeBPath();
     vector<Path> getcellPath(int t);
     vector<Path> gethomoPath(int t);
