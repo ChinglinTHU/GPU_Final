@@ -61,20 +61,20 @@ void warp::warpImageMesh(Mat img, Mat & warpimg, BundleHomo C, BundleHomo P)
 			int N = 0;
 			Point2f sumpt(0.f, 0.f);
 			pt[0] = cellPtsT[index(i, j)];
-cerr << "(" << i << ", " << j << ")" << endl;
+//cerr << "(" << i << ", " << j << ")" << endl;
 			for (int I = max(0, i-1); I < min(width-1, i+1); I++)
 				for (int J = max(0, j-1); J < min(height-1, j+1); J++)
 				{
 					N++;
 					perspectiveTransform(pt, warpPt, C[I][J].inv());
-cerr << "\t(" << I << ", " << J << ") " << endl;
-cerr << "C[I][J].inv() = " << C[I][J].inv() << endl;
-cerr << "warpPt = " << warpPt[0] << endl;
+//cerr << "\t(" << I << ", " << J << ") " << endl;
+//cerr << "C[I][J].inv() = " << C[I][J].inv() << endl;
+//cerr << "warpPt = " << warpPt[0] << endl;
 					sumpt += warpPt[0];
 				}
 
 			cellPts0[index(i, j)] = sumpt / N;
-cerr << "(" << i << ", " << j << ") = " << cellPts0[index(i, j)] << endl;
+//cerr << "(" << i << ", " << j << ") = " << cellPts0[index(i, j)] << endl;
 			if (i == 0 && j == 0)
 			{
 				minx = cellPts0[index(i, j)].x;
@@ -125,7 +125,7 @@ cerr << "dist = " << dist << endl;
 				}
 
 			cellPts0[index(i, j)] = sumpt / N;
-//cerr << "(" << i << ", " << j << ") = " << cellPts0[index(i, j)] << endl;			
+////cerr << "(" << i << ", " << j << ") = " << cellPts0[index(i, j)] << endl;			
 		}
 
 	if (dist > 4000.f)
@@ -215,7 +215,7 @@ Point warp::warpImgByVertex(Mat img, Mat & warpimg, vector<Point2f> pt, vector<P
 				}
 
 			h = findHomography(P, WP);
-//cerr << "(" << i << ", " << j << ") = " << h << endl;	
+////cerr << "(" << i << ", " << j << ") = " << h << endl;	
 			warpPerspective(frame, warp_frame, h, mask.size());
 			// fb->feed(warp_frame, mask, Point(0, 0));
 			blender.feed(warp_frame, mask, Point(0, 0));
@@ -245,7 +245,7 @@ Point warp::warpImgByVertex(Mat img, Mat & warpimg, vector<Point2f> pt, vector<P
 	//free(fb);
 	warp_frame.convertTo(warp_frame, CV_8UC3);
 
-	///* Draw Points on warpframe
+	/* Draw Points on warpframe
 	Mat warp_frame_points;
 	DrawPoints(warp_frame, warp_frame_points, warppt, Point(0, 0));
 	namedWindow("warp_frame_points", WINDOW_NORMAL);
