@@ -15,6 +15,7 @@
 using namespace std;
 using namespace cv;
 using namespace cv::cuda;
+typedef vector<vector<Mat> > BundleHomo;
 
 class asapWarp
 {
@@ -24,7 +25,7 @@ public:
 	~asapWarp();
 	void SetControlPts(vector<Point2f> prevPts, vector<Point2f> nowPts, Mat globalH);
 	void Solve();
-	void CalcHomos(Mat homos);
+	void CalcHomos(BundleHomo & homos);
     void PrintConstraints(bool all);
     void PrintVertex();
 

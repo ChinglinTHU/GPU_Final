@@ -39,7 +39,6 @@ warp::~warp(){}
 
 void warp::warpImageMesh(Mat img, Mat & warpimg, BundleHomo C, BundleHomo P)
 {
-cerr << "1 " << endl;
 
 	this->height = asap.height;
 	this->width = asap.width;
@@ -51,7 +50,7 @@ cerr << "1 " << endl;
 		{
 			cellPtsT[index(i, j)] = asap.compute_pos(i, j);
 		}
-cerr << "2 " << endl;
+
 	vector<Point2f> pt(1);
 	vector<Point2f> warpPt(1);
 
@@ -62,15 +61,20 @@ cerr << "2 " << endl;
 			int N = 0;
 			Point2f sumpt(0.f, 0.f);
 			pt[0] = cellPtsT[index(i, j)];
+cerr << "(" << i << ", " << j << ")" << endl;
 			for (int I = max(0, i-1); I < min(width-1, i+1); I++)
 				for (int J = max(0, j-1); J < min(height-1, j+1); J++)
 				{
 					N++;
 					perspectiveTransform(pt, warpPt, C[I][J].inv());
+cerr << "\t(" << I << ", " << J << ") " << endl;
+cerr << "C[I][J].inv() = " << C[I][J].inv() << endl;
+cerr << "warpPt = " << warpPt[0] << endl;
 					sumpt += warpPt[0];
 				}
 
 			cellPts0[index(i, j)] = sumpt / N;
+cerr << "(" << i << ", " << j << ") = " << cellPts0[index(i, j)] << endl;
 			if (i == 0 && j == 0)
 			{
 				minx = cellPts0[index(i, j)].x;
@@ -85,9 +89,8 @@ cerr << "2 " << endl;
 				miny = min(cellPts0[index(i, j)].y, miny);
 				maxy = max(cellPts0[index(i, j)].y, maxy);
 			}
-//cerr << "(" << i << ", " << j << ") = " << cellPts0[index(i, j)] << endl;
+
  		}
-cerr << "3 " << endl;
 
 	float dist = max(maxx-minx, maxy-miny); 
 	float rate = 1.f;
@@ -107,8 +110,6 @@ cerr << "dist = " << dist << endl;
 	waitKey(0);
 	//*/
 
-cerr << "4 " << endl;
-
 	for (int i = 0; i < width; i++)
 		for (int j = 0; j < height; j++)
 		{
@@ -127,8 +128,6 @@ cerr << "4 " << endl;
 //cerr << "(" << i << ", " << j << ") = " << cellPts0[index(i, j)] << endl;			
 		}
 
-cerr << "5 " << endl;
-
 	if (dist > 4000.f)
 	{
 		rate = 4000.f/dist;
@@ -139,14 +138,12 @@ cerr << "5 " << endl;
 	warpImgByVertex(originImg, warpimg, cellPts0, cellPtsT, false, offset, img.size());
 	originImg.release();
 
-cerr << "6 " << endl;
 	/* imshow
 	namedWindow("warpimg", WINDOW_AUTOSIZE);
 	imshow("warpimg", warpimg);
 	waitKey(0);
 	//*/
 
-cerr << "7 " << endl;
 }
 
 Point warp::warpImgByVertex(Mat img, Mat & warpimg, vector<Point2f> pt, vector<Point2f> warppt, 
@@ -154,7 +151,6 @@ Point warp::warpImgByVertex(Mat img, Mat & warpimg, vector<Point2f> pt, vector<P
 {
 	// offset means that offset -> (0, 0) 
 
-cerr << "8 " << endl;
 	int minx = img.size().width;
 	int maxx = 0;
 	int miny = img.size().height;
@@ -187,20 +183,9 @@ cerr << "8 " << endl;
 	int sizex = maxx - minx + 1;
 	int sizey = maxy - miny + 1;
 
-cerr << "9 " << endl;
-cerr << "sizex = " << sizex << endl;
-cerr << "sizey = " << sizey << endl;
-
-	/*
-	Ptr<Blender> blender;
-	blender = Blender::createDefault(Blender::FEATHER, true);
-	FeatherBlender* fb = dynamic_cast<FeatherBlender*>(blender.get());
-	fb->prepare(Rect(0, 0, sizex, sizey));
-	*/
 	FeatherBlender blender(0.5f);  //sharpness
 	blender.prepare(Rect(0, 0, sizex, sizey));
 
-cerr << "10 " << endl;	
 	Mat frame;
 	img.convertTo(frame, CV_16SC3);
 
@@ -236,7 +221,6 @@ cerr << "10 " << endl;
 			blender.feed(warp_frame, mask, Point(0, 0));
 		}
 
-cerr << "11 " << endl;
 	Mat mask = Mat::zeros(Size(sizex, sizey), CV_8U);
 	if (!all)
 	{
@@ -253,7 +237,6 @@ cerr << "11 " << endl;
 	sizex = maxx - minx + 1;
 	sizey = maxy - miny + 1;
 
-cerr << "12 " << endl;
 	Mat warp_frame;
 
 	mask(Rect(minx, miny, sizex, sizey)).setTo(Scalar::all(255));
@@ -261,18 +244,22 @@ cerr << "12 " << endl;
 	blender.blend(warp_frame, mask);
 	//free(fb);
 	warp_frame.convertTo(warp_frame, CV_8UC3);
-cerr << "13 " << endl;
-	/* Draw Points on warpframe
+
+	///* Draw Points on warpframe
 	Mat warp_frame_points;
 	DrawPoints(warp_frame, warp_frame_points, warppt, Point(0, 0));
-	*/
+	namedWindow("warp_frame_points", WINDOW_NORMAL);
+	imshow("warp_frame_points", warp_frame_points);
+	waitKey(0);
+	//*/
+
 	warpimg = Mat::zeros(s, warp_frame.type());
 	warp_frame(Rect(minx, miny, sizex, sizey)).copyTo(warpimg(Rect(0, 0, sizex, sizey)));
 
 	frame.release();
 	warp_frame.release();
 	mask.release();
-cerr << "14 " << endl;
+
 	return offset;
 }
 

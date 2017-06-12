@@ -99,7 +99,7 @@ int main(int argc, const char **argv)
 		timer_count.Start();
 		
 		for (int i = 0; i < gray_frames.size(); i++)
-	//	for (int i = 0; i < 100; i++)
+	//	for (int i = 0; i < 50; i++)
 		{
 			printf("Detecting feature: %d \n", i);
 			GpuMat cuda_frame;
@@ -147,42 +147,48 @@ int main(int argc, const char **argv)
 		int height = frames[0].rows;
 		int width = frames[0].cols;
 		int cut = 2*2*2;
+		int cuth = cut;
+		int cutw = cut+5;
 		double weight = 1;
 		
-		vector<Mat> VecHomo;
+		vector<BundleHomo> VecHomo;
 		
 		for (int i = 0; i < vec_now_pts.size(); i++)
 		{
-			asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
+			asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 1); 
 			printf("Computing frame Homographies (%d, %d) \n", i, i+1);	
 
-			asap.SetControlPts(vec_now_pts[i], vec_next_pts[i], vec_global_homo[i]);
+			//asap.SetControlPts(vec_now_pts[i], vec_next_pts[i], vec_global_homo[i]);
+			asap.SetControlPts(vec_next_pts[i], vec_now_pts[i], vec_global_homo[i].inv());
 			//cerr << "Solve()" << endl;
 			asap.Solve();
 			// asap.PrintVertex();		
 
 			//cerr << "CalcHomos()" << endl;
 			// to get homographies for each cell of each frame
-			Mat homo = Mat::zeros(cut, cut, CV_32FC(9));
-			asap.CalcHomos(homo);
+			// BundleHomo homo; // = Mat::zeros(cutw, cuth, CV_32FC(9));
+			BundleHomo homo_t1_t0(width-1, vector<Mat> (height-1));
+			asap.CalcHomos(homo_t1_t0);
 			//cerr << "end" << endl;
-			VecHomo.push_back(homo);
+			VecHomo.push_back(homo_t1_t0);
 			
 		}
 
 		// Compute bundled camera path
 		vector<Mat> Vec;
 		
-		allPath allpath = allPath(cut, cut, VecHomo.size()+1);
+		allPath allpath = allPath(cuth, cutw, VecHomo.size()+1);
 		Mat homo = Mat::eye(3, 3, CV_32FC1);
 		for (int t = 0; t < VecHomo.size(); t++)
 		{
 			printf("Compute bundled camera path %d \n", t);	
-			for (int i = 0; i < cut; i++)
-				for (int j = 0; j < cut; j++)
+//cerr << VecHomo[t].size() << " = VecHomo[t].size()" << endl;
+			for (int i = 0; i < cutw; i++)
+				for (int j = 0; j < cuth; j++)
 				{
-					Vec9f tmp = VecHomo[t].at<Vec9f>(i, j);
-					allpath.setHomo(i, j, t, tmp);
+					// Vec9f tmp = VecHomo[t].at<Vec9f>(i, j);
+					// allpath.setHomo(i, j, t, tmp);
+					allpath.setHomo(i, j, t, VecHomo[t][i][j].inv());
 				}
 
 		}
@@ -236,17 +242,18 @@ int main(int argc, const char **argv)
 		vector<Mat> warp_frames;
 		Mat globalH = Mat::eye(3, 3, CV_64FC1);
 		
-		asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
+		asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 1); 
 		warp W(asap);
 		for (int t = 0; t < min(1000, allpath.time); t++)
 		{
-			//if (t % 40 != 0)
-			//	continue;
+			if (t < 140 || t > 155)
+				continue;
 			
 			printf("Image Synthesis %d \n", t);
 			///* my new warpimg method
 			Mat warp_frame;
 			W.warpImageMesh(frames[t], warp_frame, allpath.getPath(t), allpath.getOptimizedPath(t));
+			// W.warpImageMesh(frames[t], warp_frame, allpath.getHomo(t), allpath.getHomo(t));
 			// warp_frames.push_back(warp_frame);
 			//cerr << "imagesyn: 1" << endl;
 

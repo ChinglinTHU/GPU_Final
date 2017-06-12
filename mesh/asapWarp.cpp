@@ -9,6 +9,7 @@ using namespace cv::cuda;
 
 typedef Vec<float, 9> Vec9f;
 typedef Vec<double, 9> Vec9d;
+typedef vector<vector<Mat> > BundleHomo;
 
 asapWarp::asapWarp(){}
 
@@ -86,18 +87,22 @@ void asapWarp::Solve()
 	for (int i = 0; i < allVertexNum; ++i)
 		cellPts.push_back(Point2f(x.at<float>(2*i, 0)+compute_pos(i%width, i/width).x, x.at<float>(2*i+1, 0)+compute_pos(i%width, i/width).y));
 
+//cerr << cellPts.size() << " = cellPts.size()" << endl;
 	perspectiveTransform(cellPts, cellPts, globalH);
 }
 
-void asapWarp::CalcHomos(Mat homos)
+void asapWarp::CalcHomos(BundleHomo & homos)
 {
 //	homos = Mat::zeros(height-1, width-1, CV_32FC(9));
 	vector<Point2f> V(4);
 	vector<Point2f> W(4);
 	Mat h;
-	for (int i = 0; i < height-1; i++)
-		for (int j = 0; j < width-1; j++)
+//cerr << "width = " << width << endl;
+//cerr << "height = " << height << endl;
+	for (int i = 0; i < width-1; i++)
+		for (int j = 0; j < height-1; j++)
 		{
+//cerr << "(i, j) = " << i << ", " << j << endl;
 			V[0] = compute_pos(i, j);
 			V[1] = compute_pos(i, j+1);
 			V[2] = compute_pos(i+1, j);
@@ -112,7 +117,11 @@ void asapWarp::CalcHomos(Mat homos)
 			// cerr << h << endl;
 			//printf("%d, %d, %d\n", homos.cols, homos.rows, homos.channels());
 			//printf("%lf ", homos.at<Vec9d>(i, j)[5]);
+			
+			//homos[i][j] = h.clone();
+			h.convertTo(homos[i][j], CV_32FC1);
 
+			/*
 			homos.at<Vec9f>(i, j)[0] = h.at<double>(0, 0);
 			homos.at<Vec9f>(i, j)[1] = h.at<double>(0, 1);
 			homos.at<Vec9f>(i, j)[2] = h.at<double>(0, 2);
@@ -122,6 +131,7 @@ void asapWarp::CalcHomos(Mat homos)
 			homos.at<Vec9f>(i, j)[6] = h.at<double>(2, 0);
 			homos.at<Vec9f>(i, j)[7] = h.at<double>(2, 1);
 			homos.at<Vec9f>(i, j)[8] = h.at<double>(2, 2);
+			*/
 		}
 }
 
@@ -186,8 +196,8 @@ int asapWarp::CreateSmoothCons(float weight)
 	int i1, i2, i3, j1, j2, j3;
 	Point2f V1, V2, V3, uv;
 	float u, v;
-	for (int i = 0; i < height-1; i++)
-		for (int j = 0; j < width-1; j++)
+	for (int i = 0; i < width-1; i++)
+		for (int j = 0; j < height-1; j++)
 		{
 			i1 = i; 	j1 = j;
 			i2 = i; 	j2 = j+1;

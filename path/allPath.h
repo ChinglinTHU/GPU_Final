@@ -25,12 +25,14 @@ public:
     void setHomo(int i, int j, int t, Mat p);
     void setHomo(int i, int j, int t, Vec9f p);
 
-    Mat getWarpHomo(int i, int j, int t);
+    
     void setPath(int i, int j, Path p);
-	Path getPath(int i, int j);
     Mat getPath(int i, int j, int t);
-    BundleHomo getPath(int t);
+    Mat getWarpHomo(int i, int j, int t);
+    Path getPath(int i, int j);
     Path getOptimizedPath(int i, int j);
+    BundleHomo getPath(int t);
+    BundleHomo getHomo(int t);
     BundleHomo getOptimizedPath(int t);
     void computePath();
     void optimizePath(int iter);

@@ -148,6 +148,23 @@ Path allPath::getPath(int i, int j)
 	return cellPath[i][j];
 }
 
+BundleHomo allPath::getHomo(int t)
+{
+	if (t >= time || t < 0)
+		throw runtime_error("allPath::getPath: index can only inside the cell.\n");
+
+	vector<vector<Mat> > path(width, vector<Mat> (height));
+	for (int i = 0; i < width; i++)
+		for (int j = 0; j < height; j++)
+		{
+			if (t > 0)
+				path[i][j] = cellHomo[i][j][t-1].clone();
+			else
+				path[i][j] = Mat::eye(3, 3, cellHomo[0][0][0].type());
+		}
+	return path;
+}
+
 BundleHomo allPath::getPath(int t)
 {
 	if (t >= time || t < 0)
@@ -251,8 +268,8 @@ void allPath::jacobiSolver(int iter)
 				// 	continue;
 				// }
 				float trans =0.f;
-				for (int i = 0; i < height; i++)
-					for (int j = 0; j < width; j++)
+				for (int i = 0; i < width; i++)
+					for (int j = 0; j < height; j++)
 					{
 						trans += abs(cellPath[i][j][r].at<float>(0,2) - cellPath[i][j][t].at<float>(0,2)) + 
 								abs(cellPath[i][j][r].at<float>(1,2) - cellPath[i][j][t].at<float>(1,2));
