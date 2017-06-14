@@ -148,14 +148,26 @@ int main(int argc, const char **argv)
 		int width = frames[0].cols;
 		int cut = 2*2*2;
 		int cuth = cut;
-		int cutw = cut+5;
+		int cutw = cut;
+		float quadWidth = width/cut;
+		float quadHeight = height/cut;
 		double weight = 1;
 		
 		vector<BundleHomo> VecHomo;
+		vector<vector<vector<Point2f>>> allCellPoints; // t,i,j
+		vector<vector<Point2f>> preCellPoints(cut+1, vector<Point2f> (cut+1));
+		vector<vector<Point2f>> curCellPoints(cut+1, vector<Point2f> (cut+1));
+		for(int i = 0; i<cut+1;i++)
+			for(int j = 0;j<cut+1;j++)
+			{
+				Point2f p = Point2f(float(i*quadWidth), float(j*quadHeight));
+				preCellPoints[i][j] = p;
+			}
+		allCellPoints.push_back(preCellPoints);
 		
 		for (int i = 0; i < vec_now_pts.size(); i++)
 		{
-			asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 1); 
+			asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
 			printf("Computing frame Homographies (%d, %d) \n", i, i+1);	
 
 			//asap.SetControlPts(vec_now_pts[i], vec_next_pts[i], vec_global_homo[i]);
@@ -163,6 +175,9 @@ int main(int argc, const char **argv)
 			//cerr << "Solve()" << endl;
 			asap.Solve();
 			// asap.PrintVertex();		
+			asap.SolvePoints(preCellPoints, curCellPoints);
+			allCellPoints.push_back(curCellPoints);
+			preCellPoints = curCellPoints;
 
 			//cerr << "CalcHomos()" << endl;
 			// to get homographies for each cell of each frame
@@ -244,15 +259,37 @@ int main(int argc, const char **argv)
 		
 		asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 1); 
 		warp W(asap);
+			BundleHomo ppath(cut, Path (cut));
+			BundleHomo ipath(cut, Path (cut));
+			vector<Point2f> VV(4);
+			vector<Point2f> WW(4);
 		for (int t = 0; t < min(1000, allpath.time); t++)
 		{
-			if (t < 140 || t > 155)
-				continue;
+			// if (t < 140 || t > 155)
+			// 	continue;
 			
 			printf("Image Synthesis %d \n", t);
 			///* my new warpimg method
 			Mat warp_frame;
-			W.warpImageMesh(frames[t], warp_frame, allpath.getPath(t), allpath.getOptimizedPath(t));
+
+			// get path by cellPoints
+			for (int i = 0;i<cut;i++)
+				for(int j = 0;j<cut;j++)
+				{
+					VV[0] = allCellPoints[0][i][j];
+					VV[1] = allCellPoints[0][i+1][j];
+					VV[2] = allCellPoints[0][i][j+1];
+					VV[3] = allCellPoints[0][i+1][j+1];
+					WW[0] = allCellPoints[t][i][j];
+					WW[1] = allCellPoints[t][i+1][j];
+					WW[2] = allCellPoints[t][i][j+1];
+					WW[3] = allCellPoints[t][i+1][j+1];
+					ppath[i][j] = findHomography(VV, WW);
+					ipath[i][j] = Mat::eye(3,3,ppath[i][j].type());
+				}
+			cout<<"ppath calc done"<<endl;
+			W.warpImageMesh(frames[t], warp_frame, ppath, allpath.getOptimizedPath(t));
+			// W.warpImageMesh(frames[t], warp_frame, allpath.getPath(t), allpath.getOptimizedPath(t));
 			// W.warpImageMesh(frames[t], warp_frame, allpath.getHomo(t), allpath.getHomo(t));
 			// warp_frames.push_back(warp_frame);
 			//cerr << "imagesyn: 1" << endl;

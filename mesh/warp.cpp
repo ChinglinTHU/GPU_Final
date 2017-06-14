@@ -66,7 +66,8 @@ void warp::warpImageMesh(Mat img, Mat & warpimg, BundleHomo C, BundleHomo P)
 				for (int J = max(0, j-1); J < min(height-1, j+1); J++)
 				{
 					N++;
-					perspectiveTransform(pt, warpPt, C[I][J].inv());
+					perspectiveTransform(pt, warpPt, C[I][J]);
+					// perspectiveTransform(pt, warpPt, C[I][J].inv());
 //cerr << "\t(" << I << ", " << J << ") " << endl;
 //cerr << "C[I][J].inv() = " << C[I][J].inv() << endl;
 //cerr << "warpPt = " << warpPt[0] << endl;
@@ -120,7 +121,8 @@ cerr << "dist = " << dist << endl;
 				for (int J = max(0, j-1); J < min(height-1, j+1); J++)
 				{
 					N++;
-					perspectiveTransform(pt, warpPt, P[I][J].inv());
+					perspectiveTransform(pt, warpPt, P[I][J]);
+					// perspectiveTransform(pt, warpPt, P[I][J].inv());
 					sumpt += warpPt[0];
 				}
 

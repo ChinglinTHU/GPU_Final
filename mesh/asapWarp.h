@@ -25,6 +25,7 @@ public:
 	~asapWarp();
 	void SetControlPts(vector<Point2f> prevPts, vector<Point2f> nowPts, Mat globalH);
 	void Solve();
+    void SolvePoints(vector<vector<Point2f>> &prePts, vector<vector<Point2f>> &curPts);
 	void CalcHomos(BundleHomo & homos);
     void PrintConstraints(bool all);
     void PrintVertex();
