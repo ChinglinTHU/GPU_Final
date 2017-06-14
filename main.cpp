@@ -168,7 +168,7 @@ int main(int argc, const char **argv)
 		timer_count.Start();		
 		for (int i = 0; i < vec_now_pts.size(); i++)
 		{
-			asapWarp asap = asapWarp(height, width, cut+1, cut+1, 1); 
+			asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 1); 
 			printf("Computing frame Homographies (%d, %d) \n", i, i+1);	
 
 			//asap.SetControlPts(vec_now_pts[i], vec_next_pts[i], vec_global_homo[i]);
@@ -302,8 +302,8 @@ int main(int argc, const char **argv)
 					ipath[i][j] = Mat::eye(3,3,ppath[i][j].type());
 				}
 			cout<<"ppath calc done"<<endl;
-			W.warpImageMesh(frames[t], warp_frame, ppath, ipath);
-			// W.warpImageMesh(frames[t], warp_frame, allpath.getPath(t), allpath.getOptimizedPath(t));
+			// W.warpImageMesh(frames[t], warp_frame, ppath, ipath);
+			W.warpImageMesh(frames[t], warp_frame, allpath.getPath(t), allpath.getOptimizedPath(t));
 			// W.warpImageMesh(frames[t], warp_frame, allpath.getHomo(t), allpath.getHomo(t));
 			// warp_frames.push_back(warp_frame);
 			//cerr << "imagesyn: 1" << endl;
