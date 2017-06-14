@@ -25,7 +25,6 @@ public:
     void setHomo(int i, int j, int t, Mat p);
     void setHomo(int i, int j, int t, Vec9f p);
 
-    
     void setPath(int i, int j, Path p);
     Mat getPath(int i, int j, int t);
     Mat getWarpHomo(int i, int j, int t);
@@ -34,6 +33,8 @@ public:
     BundleHomo getPath(int t);
     BundleHomo getHomo(int t);
     BundleHomo getOptimizedPath(int t);
+
+    void computePathOnly30Frames();
     void computePath();
     void optimizePath(int iter);
     void jacobiSolver(int iter = 20);
