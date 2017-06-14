@@ -118,6 +118,23 @@ void allPath::computePath()
 
 }
 
+void allPath::computePathOnly30Frames()
+{
+	for (int i = 0; i < width; i++)
+		for (int j = 0; j < height; j++)
+		{
+			cellPath[i][j][0] = Mat::eye(3, 3, CV_32FC1);
+			for (int t = 1; t < time; t++)
+			{
+				int T = max(t-30, 0);
+				cellPath[i][j][t] = cellHomo[i][j][t-1] * cellPath[i][j][t-1] * cellHomo[i][j][T].inv();
+				optPath[i][j][t] = cellPath[i][j][t].clone();
+				tmpPath[i][j][t] = cellPath[i][j][t].clone();
+			}
+		}
+
+}
+
 void allPath::computeWarp()
 {
 	for (int i = 0; i < width; i++)
@@ -214,10 +231,11 @@ void allPath::optimizePath(int iter)
 			for (int i = 0; i < width; i++)
 				for (int j = 0; j < height; j++)
 				{
+
 					sta_i = i-1 < 0 ? 0 : i-1;
 					end_i = i+1 > width-1 ? width-1 : i+1;
 					sta_j = j-1 < 0 ? 0 : j-1;
-					end_j = j+1 > width-1 ? width-1 : j+1;
+					end_j = j+1 > height-1 ? height-1 : j+1;
 					
 					int num = 0;
 					float weight = 0.f;

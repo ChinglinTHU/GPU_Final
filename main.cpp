@@ -79,7 +79,7 @@ int main(int argc, const char **argv)
 			cur_frame = source->nextFrame();
 			if(cur_frame.empty()) break;
 			cv::cvtColor(cur_frame, gray_frame, CV_BGR2GRAY);
-			// if (s == 8 || s == 50 || s == 100 || s == 150 || s == 200 || s == 246)
+			// if (s < 50)
 			if (true)
 			{
 				frames.push_back(cur_frame); // TODO: do i need to change its format?
@@ -99,7 +99,6 @@ int main(int argc, const char **argv)
 		timer_count.Start();
 		
 		for (int i = 0; i < gray_frames.size(); i++)
-	//	for (int i = 0; i < 50; i++)
 		{
 			printf("Detecting feature: %d \n", i);
 			GpuMat cuda_frame;
@@ -153,6 +152,8 @@ int main(int argc, const char **argv)
 		
 		vector<BundleHomo> VecHomo;
 		
+		timer_count.Reset();
+		timer_count.Start();		
 		for (int i = 0; i < vec_now_pts.size(); i++)
 		{
 			asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 1); 
@@ -173,10 +174,14 @@ int main(int argc, const char **argv)
 			VecHomo.push_back(homo_t1_t0);
 			
 		}
+		timer_count.Pause();
+		printf_timer(timer_count);
 
 		// Compute bundled camera path
 		vector<Mat> Vec;
 		
+		timer_count.Reset();
+		timer_count.Start();
 		allPath allpath = allPath(cuth, cutw, VecHomo.size()+1);
 		Mat homo = Mat::eye(3, 3, CV_32FC1);
 		for (int t = 0; t < VecHomo.size(); t++)
@@ -192,13 +197,20 @@ int main(int argc, const char **argv)
 				}
 
 		}
-		
-		allpath.computePath();
+		// allpath.computePath();
+		allpath.computePathOnly30Frames();
+		timer_count.Pause();
+		printf_timer(timer_count);
 
-		// allpath.optimizePath(20);
-		allpath.jacobiSolver();
 
-		allpath.computeWarp();
+		timer_count.Reset();
+		timer_count.Start();
+		allpath.optimizePath(20);
+		// allpath.jacobiSolver();
+		timer_count.Pause();
+		printf_timer(timer_count);
+
+		// allpath.computeWarp();
 
 		vector<Mat> path = allpath.getPath(0, 0);
 		vector<Mat> optpath = allpath.getOptimizedPath(0, 0);
@@ -208,7 +220,7 @@ int main(int argc, const char **argv)
 		vector<Point2f> stable(1);
 		vector<Point2f> tmp(1);
 		
-		float scale = 2.f;
+		float scale = 4.f;
 		Point2f offset(500.f, 500.f);
 		for (int i = 0; i < path.size(); i++)
 		{
@@ -230,7 +242,7 @@ int main(int argc, const char **argv)
 				arrowedLine(picture, tmp[0], stable[0], Scalar(0,0,255));  // red
 			}
 		}
-		imwrite("optimize_path.png", picture);
+		imwrite("optimize_path.jpg", picture);
 		
 		//namedWindow("Display window", WINDOW_AUTOSIZE);
 		//imshow("Display window", picture );
@@ -242,12 +254,14 @@ int main(int argc, const char **argv)
 		vector<Mat> warp_frames;
 		Mat globalH = Mat::eye(3, 3, CV_64FC1);
 		
+		timer_count.Reset();
+		timer_count.Start();
 		asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 1); 
 		warp W(asap);
 		for (int t = 0; t < min(1000, allpath.time); t++)
 		{
-			if (t < 140 || t > 155)
-				continue;
+			//if (t < 140 || t > 155)
+			//	continue;
 			
 			printf("Image Synthesis %d \n", t);
 			///* my new warpimg method
@@ -267,66 +281,13 @@ int main(int argc, const char **argv)
 			frames[t].copyTo(frame_warp(Rect(0, 0, frames[t].cols, frames[t].rows)));
 			warp_frame.copyTo(frame_warp(Rect(0, frames[t].rows, warp_frame.cols, warp_frame.rows)));
 
-			sprintf(str, "result/frame_warp_%03d.png", t);
+			sprintf(str, "result/frame_warp_%03d.jpg", t);
 			imwrite(str, frame_warp);
-
-			//*/
-
-			/* original method
-			Ptr<Blender> blender;
-			blender = Blender::createDefault(Blender::FEATHER, true);
-			FeatherBlender* fb = dynamic_cast<FeatherBlender*>(blender.get());
-			fb->prepare(Rect(0, 0, width, height));
-			
-			if (t > 0)
-				globalH = vec_global_homo[t-1] * globalH;
-
-			cout << "global at time " << t << endl;
-			cout << globalH << endl;
-			
-			Mat frame = frames[t];
-			frame.convertTo(frame, CV_16SC3);
-			for (int i = 0; i < cut; i++)
-				for (int j = 0; j < cut; j++)
-				{
-					Mat warp_frame, mask, warp_mask, h;
-					h = allpath.getWarpHomo(i, j, t); // PC^(-1)
-					// h = allpath.getPath(i, j, t).inv(); // C^(-1)
-					// h = globalH.inv(); // G^(-1)
-
-
-					mask = Mat::zeros(frame.size(), CV_8U);
-					mask(Rect(asap.compute_pos(i, j), asap.compute_pos(i+1, j+1))).setTo(Scalar::all(255));
-
-					warpPerspective(frame, warp_frame, h, frame.size());
-					warpPerspective(mask, warp_mask, h, mask.size());
-
-					fb->feed(warp_frame, warp_mask, Point(0, 0));
-				}
-
-			Mat warp_frame;
-			Mat mask = Mat::zeros(frame.size(), CV_8U);
-			mask.setTo(Scalar::all(255));
-			fb->blend(warp_frame, mask);
-			warp_frame.convertTo(warp_frame, CV_8UC3);
-
-			warp_frames.push_back(warp_frame);
-			*/
 		}
+		timer_count.Pause();
+		printf_timer(timer_count);
 
-		/*
-		imwrite("match_00.png", VecImg[0]);
-		imwrite("match_01.png", VecImg[1]);
-		imwrite("match_02.png", VecImg[2]);
-		imwrite("match_03.png", VecImg[3]);
-		imwrite("match_04.png", VecImg[4]);
-		imwrite("match_05.png", VecImg[5]);
-		imwrite("match_06.png", VecImg[6]);
-		imwrite("match_07.png", VecImg[7]);
-		imwrite("match_08.png", VecImg[8]);
-		imwrite("match_09.png", VecImg[9]);
-		imwrite("match_10.png", VecImg[10]);
-		*/
+
 
 	}
 	catch (const exception &e)
