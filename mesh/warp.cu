@@ -144,16 +144,16 @@ __global__ void warpImgByVertexGPU(PtrStepSz<uchar3> const img, PtrStepSz<uchar3
 
 		if (cellindex < 0)
 			return;
-		warpTx = CH[9*cellindex+0]*ptx + CH[9*cellindex+1]*pty + CH[9*cellindex+2]*1.f;
-		warpTy = CH[9*cellindex+3]*ptx + CH[9*cellindex+4]*pty + CH[9*cellindex+5]*1.f;
-		warpTz = CH[9*cellindex+6]*ptx + CH[9*cellindex+7]*pty + CH[9*cellindex+8]*1.f;
-		warpTx = warpTx / warpTz;
-		warpTy = warpTy / warpTz;
+		float warpTx2 = CH[9*cellindex+0]*warpTx + CH[9*cellindex+1]*warpTy + CH[9*cellindex+2]*1.f;
+		float warpTy2 = CH[9*cellindex+3]*warpTx + CH[9*cellindex+4]*warpTy + CH[9*cellindex+5]*1.f;
+		float warpTz2 = CH[9*cellindex+6]*warpTx + CH[9*cellindex+7]*warpTy + CH[9*cellindex+8]*1.f;
+		warpTx2 = warpTx2 / warpTz2;
+		warpTy2 = warpTy2 / warpTz2;
 
-		int floorx = int(warpTx);
-		int floory = int(warpTy);
-		float deltax = warpTx-float(floorx);
-		float deltay = warpTy-float(floory);
+		int floorx = int(warpTx2);
+		int floory = int(warpTy2);
+		float deltax = warpTx2-float(floorx);
+		float deltay = warpTy2-float(floory);
 
 		if (floorx > img.cols-1 || floorx+1 < 0 || floory > img.rows-1 || floory+1 < 0)
 			return;
