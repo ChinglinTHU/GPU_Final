@@ -171,7 +171,32 @@ void allPath::computePathOnly30Frames()
 			for (int t = 1; t < time; t++)
 			{
 				int T = max(t-30, 0);
-				cellPath[i][j][t] = cellHomo[i][j][t-1] * cellPath[i][j][t-1] * cellHomo[i][j][T].inv();
+				Mat h = cellHomo[i][j][T].inv();
+				cellPath[i][j][t] = cellHomo[i][j][t-1] * cellPath[i][j][t-1] * h;
+				optPath[i][j][t] = cellPath[i][j][t].clone();
+				tmpPath[i][j][t] = cellPath[i][j][t].clone();
+			}
+		}
+
+}
+
+void allPath::computePath40FramesWithWeight()
+{
+	Mat E = Mat::eye(3, 3, CV_32FC1);
+	for (int i = 0; i < width; i++)
+		for (int j = 0; j < height; j++)
+		{			
+			for (int t = 0; t < time; t++)
+			{
+				cellPath[i][j][t] = E.clone();
+				for (int T = t-1; T >= max(t-30, 0); T--)
+					cellPath[i][j][t] = cellPath[i][j][t] * cellHomo[i][j][T];
+
+				for (int k = t-30-1; k >= max(t-30-10, 0); k--)
+				{
+					float u = 0.1f*(k-(t-30)+10);
+					cellPath[i][j][t] = cellPath[i][j][t] * (u*cellHomo[i][j][k] + (1-u)*E);
+				}
 				optPath[i][j][t] = cellPath[i][j][t].clone();
 				tmpPath[i][j][t] = cellPath[i][j][t].clone();
 			}
@@ -273,7 +298,7 @@ Path allPath::getOptimizedPath(int i, int j)
 
 void allPath::optimizePath(int iter)
 {
-	float w = .3f;
+	float w = .1f;
 
 	printf("Optimizing path: \n");
 	for (int k = 0; k < iter; k++)
@@ -669,31 +694,31 @@ vector<Path> allPath::getbPath(int t)
 	return P;
 }
 
-vector<PtsPath> allPath::getcellPoints(int t)
-{
-	if (t < 0 || t > time-1)
-		throw runtime_error("allPath::getoptPoints: index can only inside the cell.\n");
-	vector<PtsPath> P(width, PtsPath (height));
-	for (int i = 0; i<width; i++)
-		for(int j = 0; j<height;j++)
-		{
-			P[i][j] = cellPoints[i][j][t];
-		}
-	return P;
-}
+// vector<PtsPath> allPath::getcellPoints(int t)
+// {
+// 	if (t < 0 || t > time-1)
+// 		throw runtime_error("allPath::getoptPoints: index can only inside the cell.\n");
+// 	vector<PtsPath> P(width, PtsPath (height));
+// 	for (int i = 0; i<width; i++)
+// 		for(int j = 0; j<height;j++)
+// 		{
+// 			P[i][j] = cellPoints[i][j][t];
+// 		}
+// 	return P;
+// }
 
-vector<PtsPath> allPath::getoptPoints(int t)
-{
-	if (t < 0 || t > time-1)
-		throw runtime_error("allPath::getoptPoints: index can only inside the cell.\n");
-	vector<PtsPath> P(width, PtsPath (height));
-	for (int i = 0; i<width; i++)
-		for(int j = 0; j<height;j++)
-		{
-			P[i][j] = optPoints[i][j][t];
-		}
-	return P;
-}
+// vector<PtsPath> allPath::getoptPoints(int t)
+// {
+// 	if (t < 0 || t > time-1)
+// 		throw runtime_error("allPath::getoptPoints: index can only inside the cell.\n");
+// 	vector<PtsPath> P(width, PtsPath (height));
+// 	for (int i = 0; i<width; i++)
+// 		for(int j = 0; j<height;j++)
+// 		{
+// 			P[i][j] = optPoints[i][j][t];
+// 		}
+// 	return P;
+// }
 
 vector<Point2f> allPath::getcellPoints(int t)
 {

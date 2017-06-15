@@ -37,6 +37,7 @@ public:
     BundleHomo getbHomo(int t);
     BundleHomo getOptimizedPath(int t);
 
+    void computePath40FramesWithWeight();
     void computePathOnly30Frames();
     void computePath();
     void optimizePath(int iter);
@@ -51,8 +52,8 @@ public:
     vector<Path> gethomoPath(int t);
     vector<Path> getoptPath(int t);
     vector<Path> getbPath(int t);
-    vector<PtsPath> getcellPoints(int t);
-    vector<PtsPath> getoptPoints(int t);
+    // vector<PtsPath> getcellPoints(int t);
+    // vector<PtsPath> getoptPoints(int t);
     vector<Point2f> getcellPoints(int t);
     vector<Point2f> getoptPoints(int t);
 

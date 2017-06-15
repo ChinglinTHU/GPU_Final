@@ -61,7 +61,7 @@ void asapWarp::SetControlPts(vector<Point2f> prevPts, vector<Point2f> nowPts, Ma
 	///* with global
 	globalH = h.clone();
 	int ind_x, ind_y;
-	int cons = num_smooth_cons;
+	int cons = num_smooth_cons-1;
 	vector<Point2f> warpNowPts;
 	perspectiveTransform(nowPts, warpNowPts, globalH.inv());
 	for (int i = 0; i < len; i++)
@@ -97,20 +97,21 @@ void asapWarp::SolvePoints(vector<vector<Point2f>> &prePts, vector<vector<Point2
 		for(int i=0; i<width; i++)
 		{
 			Point2f p = cellPts[j*width+i];
-			// cout<<p<<endl;
+			// cout<<j<<" "<<i<<endl;
 			p.x=p.x<0?0:p.x;
 			p.x=p.x>=imgWidth?imgWidth-1:p.x;
 			p.y=p.y<0?0:p.y;
 			p.y=p.y>=imgHeight?imgHeight-1:p.y;
+			// cout<<p<<endl;
 
 			// calc which cell this cellPoint belong to
 			int celli = (int)(p.x / quadWidth);
 			int cellj = (int)(p.y / quadHeight);
-
+			// cout<<celli<<", "<<cellj<<endl;
 			// calc uv, the w is counted clockwise
 			float u = cellPts[j*width+i].x / (float)(quadWidth) - (float)(celli);
 			float v = cellPts[j*width+i].y / (float)(quadHeight) - (float)(cellj);
-
+			// cout<<u<<","<<v<<endl;
 			float w0 = (1-u)*(1-v);
 			float w1 = u*(1-v);
 			float w2 = (1-u)*v;
