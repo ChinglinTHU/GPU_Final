@@ -15,19 +15,23 @@
 using namespace std;
 using namespace cv;
 using namespace cv::cuda;
+typedef vector<vector<Mat> > BundleHomo;
 
 class asapWarp
 {
 public:
+    asapWarp();
 	asapWarp(int height, int width, int cellheight, int cellwidth, float weight);
 	~asapWarp();
-	void SetControlPts(vector<Point2f> prevPts, vector<Point2f> nowPts);
+	void SetControlPts(vector<Point2f> prevPts, vector<Point2f> nowPts, Mat globalH);
 	void Solve();
-	Mat Warp(Mat Img, int gap);
-	void CalcHomos(Mat homos);
+    void SolvePoints(vector<vector<Point2f>> &prePts, vector<vector<Point2f>> &curPts);
+	void CalcHomos(BundleHomo & homos);
     void PrintConstraints(bool all);
     void PrintVertex();
 
+    Point2f compute_pos(int i, int j);
+    
     Mat Constraints;
     Mat Constants;
 
@@ -39,8 +43,6 @@ public:
     int rowCount;
     int columns;
     
-    vector<int> x_index;
-    vector<int> y_index;
     
     vector<Point2f> cellPts;
     int allVertexNum;
@@ -51,6 +53,7 @@ public:
     int height,width; // mesh height,mesh width
     int quadWidth,quadHeight; // quadWidth,%quadHeight
     int imgHeight,imgWidth; // imgHeight,imgWidth
+    Mat globalH;
     
     //Mat warpIm;
     //float gap;
@@ -63,7 +66,7 @@ private:
 
 	// void quadWarp(cv::Mat im, Quad q1, Quad q2);
 	// compute position by index
-	Point2f compute_pos(int i, int j);
+	
 	Point2f compute_uv(const Point2f V1, const Point2f V2, const Point2f V3);
 	int index_x(int i, int j);
 	int index_y(int i, int j);

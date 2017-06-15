@@ -15,40 +15,100 @@ typedef vector<Mat> Path;
 
 allPath::allPath(int height, int width, int t)
 {
-
+	cout<<"allallpath init...."<<endl;
 	this->height = height;
 	this->width = width;
 	this->time = t;
 
 	vector<vector<Path> > cellPath(width, vector<Path> (height));
 	vector<vector<Path> > cellHomo(width, vector<Path> (height));
+	vector<vector<Path> > warpHomo(width, vector<Path> (height));
 	vector<vector<Path> > optPath(width, vector<Path> (height));
 	vector<vector<Path> > tmpPath(width, vector<Path> (height));
 	vector<vector<Path> > BPath(width, vector<Path> (height));
 
+	/* Panda's Code
+	vector<vector<Path> > BPath(width, vector<Path> (height));
+	//*/ 
+
 	for (int i = 0; i < width; i++)
 		for (int j = 0; j < height; j++)
 		{
+			warpHomo[i][j] = vector<Mat>(this->time);
 			optPath[i][j] = vector<Mat>(this->time);
 			tmpPath[i][j] = vector<Mat>(this->time);
 			cellPath[i][j] = vector<Mat>(this->time);
 			BPath[i][j] = vector<Mat>(this->time);
 			cellHomo[i][j] = vector<Mat>(this->time-1);
+			/* Panda's Code
+			BPath[i][j] = vector<Mat>(this->time);
+			//*/
+
 			for (int t = 0; t < this->time; t++)
 			{
+				warpHomo[i][j][t] = Mat::eye(3, 3, CV_32FC1);
 				cellPath[i][j][t] = Mat::eye(3, 3, CV_32FC1);
 				optPath[i][j][t] = Mat::eye(3, 3, CV_32FC1);
 				BPath[i][j][t] = Mat::eye(3, 3, CV_32FC1);
 				tmpPath[i][j][t] = Mat::eye(3, 3, CV_32FC1);
+				/* Panda's Code
+				BPath[i][j][t] = Mat::eye(3, 3, CV_32FC1);
+				//*/
 				if (t < this->time-1)
-					cellHomo[i][j][t] = Mat::eye(3, 3, CV_32FC1);
+				{
+					cellHomo[i][j][t] = Mat::eye(3, 3, CV_32FC1);	
+				}
 			}
 		}
 
 	this->cellPath = cellPath;
 	this->cellHomo = cellHomo;
+	this->warpHomo = warpHomo;
 	this->optPath = optPath;
 	this->tmpPath = tmpPath;
+	/* Panda's Code
+	this->BPath = BPath;
+	//*/
+}
+
+allPath::allPath(int height, int width, int t, vector<vector<vector<Point2f>>> allCellPts)
+{
+	cout<<"allPath init...";
+	this->height = height;
+	this->width = width;
+	this->time = t;
+
+	vector<vector<PtsPath> > cellPoints(width, vector<PtsPath> (height));
+	vector<vector<PtsPath> > optPoints(width, vector<PtsPath> (height));
+	vector<vector<PtsPath> > tmpPoints(width, vector<PtsPath> (height));
+	vector<vector<Path> > BPath(width, vector<Path> (height));
+
+	/* Panda's Code
+	vector<vector<Path> > BPath(width, vector<Path> (height));
+	//*/ 
+
+	for (int i = 0; i < width; i++)
+		for (int j = 0; j < height; j++)
+		{
+			cellPoints[i][j] = PtsPath(this->time);
+			optPoints[i][j] = PtsPath(this->time);
+			tmpPoints[i][j] = PtsPath(this->time);
+			BPath[i][j] = vector<Mat>(this->time);
+
+			for (int t = 0; t < this->time; t++)
+			{
+				cellPoints[i][j][t] = allCellPts[t][i][j];
+				optPoints[i][j][t] = allCellPts[t][i][j];
+				tmpPoints[i][j][t] = allCellPts[t][i][j];
+				BPath[i][j][t] = Mat::eye(3, 3, CV_32FC1);
+			}
+		}
+
+	this->cellPoints = cellPoints;
+	this->tmpPoints = tmpPoints;
+	this->optPoints = optPoints;
+	this->BPath = BPath;
+	cout<<"done"<<endl;
 }
 
 allPath::~allPath(){}
@@ -73,7 +133,7 @@ void allPath::setHomo(int i, int j, int t, Mat h)
 {
 	if (i >= width || j >= height || t >= time-1 || i < 0 || j < 0 || t < 0)
 		throw runtime_error("allPath::setHomo: index can only inside the cell.\n");
-	cellHomo[i][j][t] = h;
+	cellHomo[i][j][t] = h.clone();
 }
 
 void allPath::setPath(int i, int j, Path p)
@@ -94,13 +154,52 @@ void allPath::computePath()
 			// cellPath[i][j][0] = Mat::eye(3, 3, CV_32FC1);
 			for (int t = 1; t < time-1; t++)
 			{
-				cellPath[i][j][t] = cellHomo[i][j][t] * cellPath[i][j][t-1];
+				cellPath[i][j][t] = cellHomo[i][j][t-1] * cellPath[i][j][t-1];
 				optPath[i][j][t] = cellPath[i][j][t].clone();
 				tmpPath[i][j][t] = cellPath[i][j][t].clone();
-				// cout<<cellPath[i][j][t]<<endl;
 			}
 		}
 
+}
+
+void allPath::computePathOnly30Frames()
+{
+	for (int i = 0; i < width; i++)
+		for (int j = 0; j < height; j++)
+		{
+			cellPath[i][j][0] = Mat::eye(3, 3, CV_32FC1);
+			for (int t = 1; t < time; t++)
+			{
+				int T = max(t-30, 0);
+				cellPath[i][j][t] = cellHomo[i][j][t-1] * cellPath[i][j][t-1] * cellHomo[i][j][T].inv();
+				optPath[i][j][t] = cellPath[i][j][t].clone();
+				tmpPath[i][j][t] = cellPath[i][j][t].clone();
+			}
+		}
+
+}
+
+void allPath::computeWarp()
+{
+	for (int i = 0; i < width; i++)
+		for (int j = 0; j < height; j++)
+			for (int t = 0; t < time; t++)
+				warpHomo[i][j][t] = optPath[i][j][t]*cellPath[i][j][t].inv();
+		
+}
+
+Mat allPath::getWarpHomo(int i, int j, int t)
+{
+	if (i >= width || j >= height || t >= time || i < 0 || j < 0 || t < 0)
+		throw runtime_error("allPath::getWarpHomo: index can only inside the cell.\n");
+	return warpHomo[i][j][t];
+}
+
+Mat allPath::getPath(int i, int j, int t)
+{
+	if (i >= width || j >= height || t >= time || i < 0 || j < 0 || t < 0)
+		throw runtime_error("allPath::getWarpHomo: index can only inside the cell.\n");
+	return cellPath[i][j][t];
 }
 
 Path allPath::getPath(int i, int j)
@@ -108,6 +207,61 @@ Path allPath::getPath(int i, int j)
 	if (i >= width || j >= height || i < 0 || j < 0)
 		throw runtime_error("allPath::getPath: index can only inside the cell.\n");
 	return cellPath[i][j];
+}
+
+BundleHomo allPath::getHomo(int t)
+{
+	if (t >= time || t < 0)
+		throw runtime_error("allPath::getPath: index can only inside the cell.\n");
+
+	vector<vector<Mat> > path(width, vector<Mat> (height));
+	for (int i = 0; i < width; i++)
+		for (int j = 0; j < height; j++)
+		{
+			if (t > 0)
+				path[i][j] = cellHomo[i][j][t-1].clone();
+			else
+				path[i][j] = Mat::eye(3, 3, cellHomo[0][0][0].type());
+		}
+	return path;
+}
+
+BundleHomo allPath::getbHomo(int t)
+{
+	if (t >= time || t < 0)
+		throw runtime_error("allPath::getPath: index can only inside the cell.\n");
+
+	vector<vector<Mat> > path(width, vector<Mat> (height));
+	for (int i = 0; i < width; i++)
+		for (int j = 0; j < height; j++)
+		{
+				path[i][j] = BPath[i][j][t].clone();
+		}
+	return path;
+}
+
+BundleHomo allPath::getPath(int t)
+{
+	if (t >= time || t < 0)
+		throw runtime_error("allPath::getPath: index can only inside the cell.\n");
+
+	vector<vector<Mat> > path(width, vector<Mat> (height));
+	for (int i = 0; i < width; i++)
+		for (int j = 0; j < height; j++)
+			path[i][j] = cellPath[i][j][t].clone();
+	return path;
+}
+
+BundleHomo allPath::getOptimizedPath(int t)
+{
+	if (t >= time || t < 0)
+		throw runtime_error("allPath::getOptimizedPath: index can only inside the cell.\n");
+
+	vector<vector<Mat> > path(width, vector<Mat> (height));
+	for (int i = 0; i < width; i++)
+		for (int j = 0; j < height; j++)
+			path[i][j] = optPath[i][j][t].clone();
+	return path;
 }
 
 Path allPath::getOptimizedPath(int i, int j)
@@ -119,7 +273,7 @@ Path allPath::getOptimizedPath(int i, int j)
 
 void allPath::optimizePath(int iter)
 {
-	float w = .5f;
+	float w = .3f;
 
 	printf("Optimizing path: \n");
 	for (int k = 0; k < iter; k++)
@@ -135,10 +289,11 @@ void allPath::optimizePath(int iter)
 			for (int i = 0; i < width; i++)
 				for (int j = 0; j < height; j++)
 				{
+
 					sta_i = i-1 < 0 ? 0 : i-1;
 					end_i = i+1 > width-1 ? width-1 : i+1;
 					sta_j = j-1 < 0 ? 0 : j-1;
-					end_j = j+1 > width-1 ? width-1 : j+1;
+					end_j = j+1 > height-1 ? height-1 : j+1;
 					
 					int num = 0;
 					float weight = 0.f;
@@ -189,15 +344,16 @@ void allPath::jacobiSolver(int iter)
 				// 	continue;
 				// }
 				float trans =0.f;
-				for (int i = 0; i < height; i++)
-					for (int j = 0; j < width; j++)
+
+				for (int i = 0; i < width; i++)
+					for (int j = 0; j < height; j++)
 					{
 						trans += abs(cellPath[i][j][r].at<float>(0,2) - cellPath[i][j][t].at<float>(0,2)) + 
 								abs(cellPath[i][j][r].at<float>(1,2) - cellPath[i][j][t].at<float>(1,2));
 					}
 				trans = trans / cellsize;
 				// cout<<"trans = "<<trans<<endl;
-				w[r-sta_t] = 1000*gaussianD(float(r-t), 10.f)*gaussianD(trans, 10.f);
+				w[r-sta_t] = 10*gaussianD(float(r-t), 10.f)*gaussianD(trans, 10.f);
 				// cout<<"w[r] = "<<w[r-sta_t]<<endl;
 				w_sum += w[r-sta_t];
 			}
@@ -289,12 +445,45 @@ void allPath::jacobiSolver(int iter)
 void allPath::jacobiPointSolver(int iter)
 {
 	float lambda = 5.0; // TODO: need to optimize
-	float cellsize = (height+1)*(width+1);
+	float cellsize = (height)*(width);
 	for(int it = 0; it < iter; it++)
 	{
 		cout<<"iter time:"<<it+1<<endl;
 		for(int t = 0; t < time; t++)
 		{
+			// int sta_t, end_t;
+			// sta_t = t-30 < 0 ? 0 : t-30;
+			// end_t = t+30 > time-1 ? time-1 : t+30;
+			// int num_omega = end_t - sta_t + 1;
+			// float w[num_omega] = {0.0};
+			// float w_sum = 0.0;
+
+			// // calc weights
+			// for (int r = sta_t; r <= end_t; r++)
+			// {
+			// 	// if(r == t)
+			// 	// {
+			// 	// 	w[r-sta_t] = 0.0;
+			// 	// 	continue;
+			// 	// }
+			// 	float trans =0.f;
+			// 	for (int i = 0; i < width; i++)
+			// 		for (int j = 0; j < height; j++)
+			// 		{
+			// 			trans += abs(cellPoints[i][j][r].x - cellPoints[i][j][t].x) + 
+			// 					abs(cellPoints[i][j][r].y - cellPoints[i][j][t].y);
+			// 		}
+			// 	trans = trans / cellsize;
+			// 	// cout<<"trans = "<<trans<<endl;
+			// 	w[r-sta_t] = gaussianD(float(r-t), 10.f)*gaussianD(trans, 10.f)*10;
+			// 	// cout<<"w[r] = "<<w[r-sta_t]<<endl;
+			// 	w_sum += w[r-sta_t];
+			// }
+
+			// each cell
+			for (int i = 0; i < width; i++)
+				for (int j = 0; j < height; j++)
+				{
 			int sta_t, end_t;
 			sta_t = t-30 < 0 ? 0 : t-30;
 			end_t = t+30 > time-1 ? time-1 : t+30;
@@ -310,24 +499,14 @@ void allPath::jacobiPointSolver(int iter)
 				// 	w[r-sta_t] = 0.0;
 				// 	continue;
 				// }
-				float trans =0.f;
-				for (int i = 0; i <= height; i++)
-					for (int j = 0; j <= width; j++)
-					{
-						trans += abs(cellPoints[i][j][r].x - cellPoints[i][j][t].x) + 
+				float trans = abs(cellPoints[i][j][r].x - cellPoints[i][j][t].x) + 
 								abs(cellPoints[i][j][r].y - cellPoints[i][j][t].y);
-					}
-				trans = trans / cellsize;
 				// cout<<"trans = "<<trans<<endl;
-				w[r-sta_t] = 1000*gaussianD(float(r-t), 10.f)*gaussianD(trans, 10.f);
+				w[r-sta_t] = gaussianD(float(r-t), 10.f)*gaussianD(trans, 10.f)*1000;
 				// cout<<"w[r] = "<<w[r-sta_t]<<endl;
 				w_sum += w[r-sta_t];
 			}
 
-			// each cell
-			for (int i = 0; i <= width; i++)
-				for (int j = 0; j <= height; j++)
-				{
 					// 1st cons
 					// tmpPath[i][j][t] = cellPath[i][j][t].clone();
 					// 2nd cons
@@ -341,54 +520,44 @@ void allPath::jacobiPointSolver(int iter)
 					//3rd cons
 					Point2f cons3(0,0);
 					int N = 0;
-						if(i>0 && j>0)
+						if(0<i && i<width-1 && 0<j && j<height-1)
 						{
-							N++;
+							N=4;
 							// tmpPath[i][j][t] += 2*optPath[i-1][j-1][t];
-							cons3 += 2*optPoints[i-1][j-1][t];
-						}
-						if(i>0)
-						{
-							N++;
-							// tmpPath[i][j][t] += 2*optPath[i-1][j][t];
+							// cons3 += 2*optPoints[i-1][j-1][t];
 							cons3 += 2*optPoints[i-1][j][t];
-						}
-						if(i>0 && j<height)
-						{
-							N++;
-							// tmpPath[i][j][t] += 2*optPath[i-1][j+1][t];
-							cons3 += 2*optPoints[i-1][j+1][t];
-						}
-						if(j>0)
-						{
-							N++;
-							// tmpPath[i][j][t] += 2*optPath[i][j-1][t];
+							// cons3 += 2*optPoints[i-1][j+1][t];
 							cons3 += 2*optPoints[i][j-1][t];
-						}
-						if(j<height)
-						{
-							N++;
-							// tmpPath[i][j][t] += 2*optPath[i][j+1][t];
 							cons3 += 2*optPoints[i][j+1][t];
+							// cons3 += 2*optPoints[i+1][j-1][t];
+							cons3 += 2*optPoints[i+1][j][t];
+							// cons3 += 2*optPoints[i+1][j+1][t];
 						}
-						if(i<width && j>0)
+						else if(0<i && i<width-1 && j==0)
 						{
-							N++;
-							// tmpPath[i][j][t] += 2*optPath[i+1][j-1][t];
-							cons3 += 2*optPoints[i+1][j-1][t];
-						}
-						if(i<width)
-						{
-							N++;
-							// tmpPath[i][j][t] += 2*optPath[i+1][j][t];
+							N=2;
+							cons3 += 2*optPoints[i-1][j][t];
 							cons3 += 2*optPoints[i+1][j][t];
 						}
-						if(i<width && j<height)
+						else if(0<i && i<width-1 && j==height-1)
 						{
-							N++;
-							// tmpPath[i][j][t] += 2*optPath[i+1][j+1][t];
-							cons3 += 2*optPoints[i+1][j+1][t];
+							N=2;
+							cons3 += 2*optPoints[i-1][j][t];
+							cons3 += 2*optPoints[i+1][j][t];
 						}
+						else if(i==0 && 0<j && j<height-1)
+						{
+							N=2;
+							cons3 += 2*optPoints[i][j-1][t];
+							cons3 += 2*optPoints[i][j+1][t];
+						}
+						else if(i==width-1 && 0<j && j<height-1)
+						{
+							N=2;
+							cons3 += 2*optPoints[i][j-1][t];
+							cons3 += 2*optPoints[i][j+1][t];
+						}
+						// N=0;cons3.x=0;cons3.y=0;
 					float gamma = 2*lambda*w_sum+2*N+1;
 					// tmpPath[i][j][t] = tmpPath[i][j][t]/gamma;
 					// cout<<"cellPath:"<<endl<<cellPath[i][j][t]<<endl
@@ -410,9 +579,15 @@ void allPath::jacobiPointSolver(int iter)
 
 	// calc homography for each cell
 	for(int t = 0; t<time;t++)
-		for(int i = 0; i < width; i++)
-			for(int j = 0; j<height;j++)
+	{
+		for(int i = 0; i < width-1; i++)
+			for(int j = 0; j<height-1;j++)
 			{
+				vector<Point2f> O(4);
+				O[0]=cellPoints[i][j][0];
+				O[1]=cellPoints[i+1][j][0];
+				O[2]=cellPoints[i][j+1][0];
+				O[3]=cellPoints[i+1][j+1][0];
 				vector<Point2f> V(4);
 				V[0]=cellPoints[i][j][t];
 				V[1]=cellPoints[i+1][j][t];
@@ -423,8 +598,15 @@ void allPath::jacobiPointSolver(int iter)
 				W[1]=optPoints[i+1][j][t];
 				W[2]=optPoints[i][j+1][t];
 				W[3]=optPoints[i+1][j+1][t];
-				BPath[i][j][t] = findHomography(V, W);
+				BPath[i][j][t] = findHomography(W,V);//*findHomography(O, V).inv();
+				// cout<<BPath[i][j][t]<<endl;
+				// cout<<W[0]<<endl;
+				// cout<<W[1]<<endl;
+				// cout<<W[2]<<endl;
+				// cout<<W[3]<<endl;
+				// getchar();
 			}
+	}
 }
 
 void allPath::computeBPath()
@@ -483,6 +665,19 @@ vector<Path> allPath::getbPath(int t)
 		for(int j = 0; j<height;j++)
 		{
 			P[i][j] = BPath[i][j][t].clone();
+		}
+	return P;
+}
+
+vector<PtsPath> allPath::getoptPoints(int t)
+{
+	if (t < 0 || t > time-1)
+		throw runtime_error("allPath::getoptPoints: index can only inside the cell.\n");
+	vector<PtsPath> P(width, PtsPath (height));
+	for (int i = 0; i<width; i++)
+		for(int j = 0; j<height;j++)
+		{
+			P[i][j] = optPoints[i][j][t];
 		}
 	return P;
 }
