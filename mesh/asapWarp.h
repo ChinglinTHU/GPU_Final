@@ -27,6 +27,7 @@ public:
 	void Solve();
     void SolvePoints(vector<vector<Point2f>> &prePts, vector<vector<Point2f>> &curPts);
 	void CalcHomos(BundleHomo & homos);
+    void PrintConstraintsSparse();
     void PrintConstraints(bool all);
     void PrintVertex();
 
@@ -34,6 +35,12 @@ public:
     
     Mat Constraints;
     Mat Constants;
+
+    int *SmoothRow, *SmoothCol;
+    float* SmoothVal;
+    int *ARow, *ACol;
+    float* AVal;
+    float* B;
 
 	// smooth constraints
 	int num_smooth_cons;
@@ -60,9 +67,12 @@ public:
 
 private:
 	int CreateSmoothCons(float weight);
+    int CreateSmoothConsSparse(float weight);
 	// the triangles
 	void addSmoothCoefficient(int & cons, int i1, int j1, int i2, int j2, int i3, int j3, float weight);
+    void addSmoothCoefficientSparse(int & cons, int & I, int i1, int j1, int i2, int j2, int i3, int j3, float weight);
     void addDataCoefficient(int & cons, Point2f pts, Point2f pts2);
+    void addDataCoefficientSparse(int & cons, int & I, Point2f prev_pt, Point2f now_pt);
 
 	// void quadWarp(cv::Mat im, Quad q1, Quad q2);
 	// compute position by index

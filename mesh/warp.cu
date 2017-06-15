@@ -63,7 +63,6 @@ __device__ int findCell(const float* point, const float x, const float y, const 
 		maxx = point[i*2+0] > maxx ? point[i*2+0] : maxx;
 		miny = point[i*2+1] < miny ? point[i*2+1] : miny;
 		maxy = point[i*2+1] > maxy ? point[i*2+1] : maxy;
-		//printf("findCell (x, y) = (%.2f, %.2f), (minx, max)\n", x, y, minx, maxx);	
 	}
 
 	if (x > maxx || x < minx || y > maxy || y < miny)
@@ -83,7 +82,7 @@ __device__ int findCell(const float* point, const float x, const float y, const 
 			V01y = point[2*((j+1)*(cellwidth+1)+i)+1];
 			V11x = point[2*((j+1)*(cellwidth+1)+i+1)+0];
 			V11y = point[2*((j+1)*(cellwidth+1)+i+1)+1];
-//printf("findCell (x, y) = (%.2f, %.2f), (i, j) = (%d, %d), V00 = (%.2f, %.2f)\n", x, y, i, j, V00x, V00y);			
+		
 			ax = V10x-V00x;
 			ay = V10y-V00y;
 			bx = x-V00x;
@@ -144,16 +143,16 @@ __global__ void warpImgByVertexGPU(PtrStepSz<uchar3> const img, PtrStepSz<uchar3
 
 		if (cellindex < 0)
 			return;
-		warpTx = CH[9*cellindex+0]*ptx + CH[9*cellindex+1]*pty + CH[9*cellindex+2]*1.f;
-		warpTy = CH[9*cellindex+3]*ptx + CH[9*cellindex+4]*pty + CH[9*cellindex+5]*1.f;
-		warpTz = CH[9*cellindex+6]*ptx + CH[9*cellindex+7]*pty + CH[9*cellindex+8]*1.f;
-		warpTx = warpTx / warpTz;
-		warpTy = warpTy / warpTz;
+		float warpTx2 = CH[9*cellindex+0]*warpTx + CH[9*cellindex+1]*warpTy + CH[9*cellindex+2]*1.f;
+		float warpTy2 = CH[9*cellindex+3]*warpTx + CH[9*cellindex+4]*warpTy + CH[9*cellindex+5]*1.f;
+		float warpTz2 = CH[9*cellindex+6]*warpTx + CH[9*cellindex+7]*warpTy + CH[9*cellindex+8]*1.f;
+		warpTx2 = warpTx2 / warpTz2;
+		warpTy2 = warpTy2 / warpTz2;
 
-		int floorx = int(warpTx);
-		int floory = int(warpTy);
-		float deltax = warpTx-float(floorx);
-		float deltay = warpTy-float(floory);
+		int floorx = int(warpTx2);
+		int floory = int(warpTy2);
+		float deltax = warpTx2-float(floorx);
+		float deltay = warpTy2-float(floory);
 
 		if (floorx > img.cols-1 || floorx+1 < 0 || floory > img.rows-1 || floory+1 < 0)
 			return;

@@ -79,7 +79,7 @@ int main(int argc, const char **argv)
 			cur_frame = source->nextFrame();
 			if(cur_frame.empty()) break;
 			cv::cvtColor(cur_frame, gray_frame, CV_BGR2GRAY);
-			// if (s > 10 && s < 15)
+			// if (s > 9 && s < 20)
 			if (true)
 			{
 				frames.push_back(cur_frame); // TODO: do i need to change its format?
@@ -165,10 +165,11 @@ int main(int argc, const char **argv)
 		allCellPoints.push_back(preCellPoints);
 
 		timer_count.Reset();
-		timer_count.Start();		
+		timer_count.Start();
+
 		for (int i = 0; i < vec_now_pts.size(); i++)
 		{
-			asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 3); 
+			asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 4); 
 			printf("Computing frame Homographies (%d, %d) \n", i, i+1);	
 
 			//asap.SetControlPts(vec_now_pts[i], vec_next_pts[i], vec_global_homo[i]);
