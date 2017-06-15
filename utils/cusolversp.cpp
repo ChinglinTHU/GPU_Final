@@ -16,14 +16,22 @@ int main()
 	// cusparseMatDescr_t descr = 0;
 	cout<<CV_VERSION<<endl;
 	int m = 4;
-	int nnz = 9;
+	int n = 3;
+	int nnz = 7;
 
 	// init host matrix
-	int ARowHost[nnz] = {0,0,0,1,2,2,2,3,3};
-	int AColHost[nnz] = {0,2,3,1,0,2,3,1,3};
-	float AValHost[nnz] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
+	// int ARowHost[nnz] = {0,0,0,1,2,2,2,3,3};
+	// int AColHost[nnz] = {0,2,3,1,0,2,3,1,3};
+	// float AValHost[nnz] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
+	// // float x = {1.0, 1.0, 1.0, 1.0}
+	// float BHost[m] = {6.0, 4.0, 18.0, 17.0};
+
+	int ARowHost[nnz] = {0,0,1,1,2,2,3};
+	int AcsrRowHost[m+1] = {0,2,4,6,7};
+	int AColHost[nnz] = {1,2,0,2,1,2,1};
+	float AValHost[nnz] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0};
 	// float x = {1.0, 1.0, 1.0, 1.0}
-	float BHost[m] = {6.0, 4.0, 18.0, 17.0};
+	float BHost[m] = {3.0, 7.0, 11.0, 7.0};
 /*
 	// init device matrix
 	int* ARow = 0;  cudaMalloc((void**)&ARow, nnz*sizeof(ARow[0]));
@@ -82,14 +90,14 @@ int main()
 	else
 		cout<<"solve success"<<endl;
 */
-	float XHost[m] = {0.0};
+	float XHost[n] = {0.0};
 	// cudaMemcpy(XHost, x, (size_t)(m*sizeof(x[0])), cudaMemcpyDeviceToHost);
 
-	cuSpSolver(ARowHost, AColHost, AValHost, BHost, XHost, m, nnz);
+	cuSpSolver(ARowHost, AColHost, AValHost, BHost, XHost, m, n, nnz);
 
 	// output x
 	cout << "x: [";
-	for(int i = 0; i<m; i++)
+	for(int i = 0; i<n; i++)
 	{
 		cout<<XHost[i]<<" ";
 	}
