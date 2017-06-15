@@ -51,7 +51,10 @@ public:
     vector<Path> gethomoPath(int t);
     vector<Path> getoptPath(int t);
     vector<Path> getbPath(int t);
+    vector<PtsPath> getcellPoints(int t);
     vector<PtsPath> getoptPoints(int t);
+    vector<Point2f> getcellPoints(int t);
+    vector<Point2f> getoptPoints(int t);
 
     int height, width, time; // mesh height,mesh width
 

@@ -502,7 +502,7 @@ void allPath::jacobiPointSolver(int iter)
 				float trans = abs(cellPoints[i][j][r].x - cellPoints[i][j][t].x) + 
 								abs(cellPoints[i][j][r].y - cellPoints[i][j][t].y);
 				// cout<<"trans = "<<trans<<endl;
-				w[r-sta_t] = gaussianD(float(r-t), 10.f)*gaussianD(trans, 10.f)*1000;
+				w[r-sta_t] = gaussianD(float(r-t), 10.f);//*gaussianD(trans, 10.f)*10;
 				// cout<<"w[r] = "<<w[r-sta_t]<<endl;
 				w_sum += w[r-sta_t];
 			}
@@ -522,16 +522,16 @@ void allPath::jacobiPointSolver(int iter)
 					int N = 0;
 						if(0<i && i<width-1 && 0<j && j<height-1)
 						{
-							N=4;
+							N=8;
 							// tmpPath[i][j][t] += 2*optPath[i-1][j-1][t];
-							// cons3 += 2*optPoints[i-1][j-1][t];
+							cons3 += 2*optPoints[i-1][j-1][t];
 							cons3 += 2*optPoints[i-1][j][t];
-							// cons3 += 2*optPoints[i-1][j+1][t];
+							cons3 += 2*optPoints[i-1][j+1][t];
 							cons3 += 2*optPoints[i][j-1][t];
 							cons3 += 2*optPoints[i][j+1][t];
-							// cons3 += 2*optPoints[i+1][j-1][t];
+							cons3 += 2*optPoints[i+1][j-1][t];
 							cons3 += 2*optPoints[i+1][j][t];
-							// cons3 += 2*optPoints[i+1][j+1][t];
+							cons3 += 2*optPoints[i+1][j+1][t];
 						}
 						else if(0<i && i<width-1 && j==0)
 						{
@@ -669,6 +669,19 @@ vector<Path> allPath::getbPath(int t)
 	return P;
 }
 
+vector<PtsPath> allPath::getcellPoints(int t)
+{
+	if (t < 0 || t > time-1)
+		throw runtime_error("allPath::getoptPoints: index can only inside the cell.\n");
+	vector<PtsPath> P(width, PtsPath (height));
+	for (int i = 0; i<width; i++)
+		for(int j = 0; j<height;j++)
+		{
+			P[i][j] = cellPoints[i][j][t];
+		}
+	return P;
+}
+
 vector<PtsPath> allPath::getoptPoints(int t)
 {
 	if (t < 0 || t > time-1)
@@ -678,6 +691,32 @@ vector<PtsPath> allPath::getoptPoints(int t)
 		for(int j = 0; j<height;j++)
 		{
 			P[i][j] = optPoints[i][j][t];
+		}
+	return P;
+}
+
+vector<Point2f> allPath::getcellPoints(int t)
+{
+	if (t < 0 || t > time-1)
+		throw runtime_error("allPath::getoptPoints: index can only inside the cell.\n");
+	vector<Point2f> P(width*height);
+	for (int i = 0; i<width; i++)
+		for(int j = 0; j<height;j++)
+		{
+			P[j*width+i] = cellPoints[i][j][t];
+		}
+	return P;
+}
+
+vector<Point2f> allPath::getoptPoints(int t)
+{
+	if (t < 0 || t > time-1)
+		throw runtime_error("allPath::getoptPoints: index can only inside the cell.\n");
+	vector<Point2f> P(width*height);
+	for (int i = 0; i<width; i++)
+		for(int j = 0; j<height;j++)
+		{
+			P[j*width+i] = optPoints[i][j][t];
 		}
 	return P;
 }
