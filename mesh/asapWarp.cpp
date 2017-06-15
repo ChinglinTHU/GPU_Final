@@ -91,42 +91,6 @@ void asapWarp::Solve()
 	perspectiveTransform(cellPts, cellPts, globalH);
 }
 
-void asapWarp::SolvePoints(vector<vector<Point2f>> &prePts, vector<vector<Point2f>> &curPts)
-{
-	for(int j = 0; j<height;j++)
-		for(int i=0; i<width; i++)
-		{
-			Point2f p = cellPts[j*width+i];
-			// cout<<p<<endl;
-			p.x=p.x<0?0:p.x;
-			p.x=p.x>=imgWidth?imgWidth-1:p.x;
-			p.y=p.y<0?0:p.y;
-			p.y=p.y>=imgHeight?imgHeight-1:p.y;
-
-			// calc which cell this cellPoint belong to
-			int celli = (int)(p.x / quadWidth);
-			int cellj = (int)(p.y / quadHeight);
-
-			// calc uv, the w is counted clockwise
-			float u = cellPts[j*width+i].x / (float)(quadWidth) - (float)(celli);
-			float v = cellPts[j*width+i].y / (float)(quadHeight) - (float)(cellj);
-
-			float w0 = (1-u)*(1-v);
-			float w1 = u*(1-v);
-			float w2 = (1-u)*v;
-			float w3 = u*v;
-
-			// calc the weighted cellPoint according to the prePts
-			p=prePts[celli][cellj]*w0;
-			p+=prePts[celli+1][cellj]*w1;
-			p+=prePts[celli][cellj+1]*w2;
-			p+=prePts[celli+1][cellj+1]*w3;
-
-			curPts[i][j] = p;
-			// cout<<p<<endl;
-		}
-}
-
 void asapWarp::CalcHomos(BundleHomo & homos)
 {
 //	homos = Mat::zeros(height-1, width-1, CV_32FC(9));

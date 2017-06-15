@@ -34,6 +34,7 @@ public:
     BundleHomo getHomo(int t);
     BundleHomo getOptimizedPath(int t);
 
+    void computePath40FramesWithWeight();
     void computePathOnly30Frames();
     void computePath();
     void optimizePath(int iter);
