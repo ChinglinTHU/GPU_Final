@@ -16,6 +16,7 @@
 #include "opencv2/xfeatures2d/cuda.hpp"
 
 #include "warp.h"
+#include "../utils/SyncedMemory.h"
 
 using namespace std;
 using namespace cv;
@@ -82,6 +83,14 @@ __device__ int findCell(const float* point, const float x, const float y, const 
 			V01y = point[2*((j+1)*(cellwidth+1)+i)+1];
 			V11x = point[2*((j+1)*(cellwidth+1)+i+1)+0];
 			V11y = point[2*((j+1)*(cellwidth+1)+i+1)+1];
+
+			minx = V00x < V01x ? V00x : V01x;
+			maxx = V10x > V11x ? V10x : V11x;
+			miny = V00y < V10y ? V00y : V10y;
+			maxy = V01y > V11y ? V01y : V11y;
+
+			if (x > maxx || x < minx || y > maxy || y < miny)
+				continue;
 		
 			ax = V10x-V00x;
 			ay = V10y-V00y;
@@ -124,11 +133,27 @@ __global__ void warpImgByVertexGPU(PtrStepSz<uchar3> const img, PtrStepSz<uchar3
 	const int y = blockIdx.y * blockDim.y + threadIdx.y;
 	const int x = blockIdx.x * blockDim.x + threadIdx.x;
 
+	__shared__ float shared_ptT[192];
+	__shared__ float shared_warppt0[192];
+	int idx;
+	for (int i = 0; i < pointNum / (blockDim.x * blockDim.y) + 1; i++)
+	{
+		idx = 2*((blockDim.x * blockDim.y)*i + threadIdx.y * blockDim.x + threadIdx.x);
+		if (idx < pointNum*2)
+		{
+			shared_ptT[idx] = ptT[idx];
+			shared_ptT[idx+1] = ptT[idx+1];
+			shared_warppt0[idx] = warppt0[idx];
+			shared_warppt0[idx+1] = warppt0[idx+1];
+		}	
+	}
+	__syncthreads();
+
 	if (x < img.cols && y <= img.rows)
 	{
 		float ptx = float(x);
 		float pty = float(y);
-		int cellindex = findCell(ptT, ptx, pty, pointNum, cellwidth, cellheight);
+		int cellindex = findCell(shared_ptT, ptx, pty, pointNum, cellwidth, cellheight);
 
 		if (cellindex < 0)
 			return;
@@ -139,7 +164,7 @@ __global__ void warpImgByVertexGPU(PtrStepSz<uchar3> const img, PtrStepSz<uchar3
 		warpTx = warpTx / warpTz;
 		warpTy = warpTy / warpTz;
 
-		cellindex = findCell(warppt0, warpTx, warpTy, pointNum, cellwidth, cellheight);
+		cellindex = findCell(shared_warppt0, warpTx, warpTy, pointNum, cellwidth, cellheight);
 
 		if (cellindex < 0)
 			return;
@@ -175,11 +200,11 @@ __global__ void warpImgByVertexGPU(PtrStepSz<uchar3> const img, PtrStepSz<uchar3
 		g = g < 0 ? 0 : g;
 		r = r > 255 ? 255 : r;
 		r = r < 0 ? 0 : r;
-
-		//warpimg(y, x) = img(roundy, roundx);
+		
 		warpimg(y, x).x = uchar(b);
 		warpimg(y, x).y = uchar(g);
 		warpimg(y, x).z = uchar(r);
+		
 	}
 }
 
@@ -243,8 +268,8 @@ void warp::warpImageMeshbyVertexGPU(Mat img, Mat & warpimg, vector<Point2f>  war
 	cudaMemcpy(C_device,    C,     M*9*sizeof(float), cudaMemcpyHostToDevice);
 
 
-	const int BLOCK_WIDTH = 16;
-	const int BLOCK_HEIGHT = 12;
+	const int BLOCK_WIDTH = 32;
+	const int BLOCK_HEIGHT = 32;
 	const int X_BLOCK_NUM = (img.cols-1)/BLOCK_WIDTH + 1;
 	const int Y_BLOCK_NUM = (img.rows-1)/BLOCK_HEIGHT + 1;
 	dim3 block = dim3(X_BLOCK_NUM, Y_BLOCK_NUM);
@@ -259,6 +284,11 @@ void warp::warpImageMeshbyVertexGPU(Mat img, Mat & warpimg, vector<Point2f>  war
 	//warpImgByVertexGPU(PtrStepSz<uchar3> const img, PtrStepSz<uchar3> warpimg, 
 	//					const float* pt, const float* warppt0, const float* PHinv, const float* C,
 	//					const int cellwidth, const int cellheight, const int pointNum)
+	if (N != 81)
+	{
+		cerr << "pointNum must equal to the given number 81 in the cuda code, need to modify the cuda code" << endl;
+		return;
+	}
 	warpImgByVertexGPU<<< block, thread >>>(img_device, warpimg_device, ptrT_mat, warp0_mat, 
 											Pinv_device, C_device, width-1, height-1, N);
 	warpimg_device.download(warpimg);
