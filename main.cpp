@@ -8,6 +8,7 @@
 #include "opencv2/core/utility.hpp"
 #include "opencv2/video.hpp"
 #include "opencv2/videostab.hpp"
+#include "opencv2/video/tracking.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/cudafeatures2d.hpp"
 #include "opencv2/features2d.hpp"
@@ -15,12 +16,18 @@
 #include "opencv2/calib3d.hpp"
 #include "opencv2/opencv_modules.hpp"
 
+/*
+#include "opencv2/imgproc.hpp"
+#include "opencv2/videoio.hpp"
+*/
+
 #include "opencv2/stitching/detail/blenders.hpp"
 
 #include "./mesh/warp.h"
 #include "./mesh/asapWarp.h"
 #include "./path/allPath.h"
 #include "./utils/Timer.h"
+//#include "./feature/MSOP.h"
 
 #define arg(name) cmd.get<string>(name)
 #define argb(name) cmd.get<bool>(name)
@@ -94,35 +101,35 @@ int main(int argc, const char **argv)
 		vector<Mat> vec_global_homo;
 		SURF_CUDA surf; // TODO: using SURF is a little slow, should change its params or change a way (Orb, FAST, BRIEF)
 		Ptr<cv::cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(surf.defaultNorm());
+		
 		surf.hessianThreshold = 5000;
 		Timer timer_count;
 		timer_count.Start();
 		
-		for (int i = 0; i < gray_frames.size(); i++)
+		TermCriteria termcrit(TermCriteria::COUNT|TermCriteria::EPS,20,0.03);
+	    Size subPixWinSize(10,10), winSize(31,31);
+	    const int MAX_COUNT = 200;
+	    bool getfeature = true;
+		vector<Point2f> points[2];
+		vector<Point2f> now_pts, next_pts;
+
+		for (int t = 0; t < gray_frames.size(); t++)
 		{
-			printf("Detecting feature: %d \n", i);
-			GpuMat cuda_frame;
-			cuda_frame.upload(gray_frames[i]);
-			GpuMat cur_points, cur_descriptors;
-			surf(cuda_frame, GpuMat(), cur_points, cur_descriptors);
-			keypointsGPU.push_back(cur_points);
-			descriptorsGPU.push_back(cur_descriptors);
-
-			if (i > 0)
+			printf("Detecting feature: %d \n", t);
+			if (getfeature)
 			{
-				// match feature points
-				vector<KeyPoint> keypoints1, keypoints2;
-				surf.downloadKeypoints(keypointsGPU[i-1], keypoints1);
-	    		surf.downloadKeypoints(keypointsGPU[i], keypoints2);
+				goodFeaturesToTrack(gray_frames[t], now_pts, MAX_COUNT, 0.01, 10, Mat(), 3, 0, 0.04);
+	        	cornerSubPix(gray_frames[t], now_pts, subPixWinSize, Size(-1,-1), termcrit);
+        	}
+        	if (t > 0)
+	        {
+	            vector<uchar> status;
+	            vector<float> err;
+	            
+	            calcOpticalFlowPyrLK(gray_frames[t-1], gray_frames[t], now_pts, next_pts, status, err, winSize,
+	                                 3, termcrit, 0, 0.001);
 
-	    		vector<DMatch> matches, ransac_matches;
-				vector<Point2f> now_pts, next_pts;
 				vector<unsigned char> match_mask;
-	   			matcher->match(descriptorsGPU[i-1], descriptorsGPU[i], matches);
-	   			matches2points(keypoints1, keypoints2, matches, now_pts, next_pts);
-
-	   			// find global & pick out outliers
-	   			// findHomography return mat with double type
 	   			Mat globalHomo = findHomography(now_pts, next_pts, RANSAC, 4, match_mask);
 
 	   			for (int j = match_mask.size() - 1; j >= 0; j--)
@@ -131,13 +138,17 @@ int main(int argc, const char **argv)
 	   					now_pts.erase(now_pts.begin()+j);
 	   					next_pts.erase(next_pts.begin()+j);
 	   				}
-	   			if(now_pts.size() != next_pts.size())
+	   			if (now_pts.size() != next_pts.size())
 	   			   	throw runtime_error("matching points have different size\n");
 	   			printf("\t(ransac_num = %d)\n", now_pts.size());
+	   			
 	   			vec_now_pts.push_back(now_pts);
 	   			vec_next_pts.push_back(next_pts);
 	   			vec_global_homo.push_back(globalHomo);
    			}
+   			if (next_pts.size() < 50)
+	   				getfeature = true;
+   			swap(next_pts, now_pts);
 		}
 		timer_count.Pause();
 		printf_timer(timer_count);
@@ -237,6 +248,18 @@ int main(int argc, const char **argv)
 			W.warpImageMeshbyVertexGPU(frames[t], warp_frame, allpath.getcellPoints(t), allpath.getoptPoints(t));
 			
 			warp_frames.push_back(warp_frame);
+
+			/*
+			printf("Write images %d \n", t);
+			
+			char str[20];
+			Mat frame_warp = Mat::zeros(frames[t].rows + warp_frames[t].rows, frames[t].cols, CV_8UC3);
+			frames[t].copyTo(frame_warp(Rect(0, 0, frames[t].cols, frames[t].rows)));
+			warp_frames[t].copyTo(frame_warp(Rect(0, frames[t].rows, warp_frames[t].cols, warp_frames[t].rows)));
+
+			sprintf(str, "result/frame_warp_%03d.jpg", t);
+			imwrite(str, frame_warp);
+			//*/
 		}
 		timer_count.Pause();
 		printf_timer(timer_count);		
