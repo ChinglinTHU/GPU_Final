@@ -21,7 +21,7 @@
 #include "opencv2/videoio.hpp"
 */
 
-#include "opencv2/stitching/detail/blenders.hpp"
+//#include "opencv2/stitching/detail/blenders.hpp"
 
 #include "./mesh/warp.h"
 #include "./mesh/asapWarp.h"
@@ -178,15 +178,27 @@ int main(int argc, const char **argv)
 		timer_count.Reset();
 		timer_count.Start();
 
+		Timer timer_jacobi, timer_solve;
+		
+
 		for (int i = 0; i < vec_now_pts.size(); i++)
+		// for (int i = 0; i < 10; i++)
 		{
-			asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 4); 
+			asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 3); 
 			printf("Computing frame Homographies (%d, %d) \n", i, i+1);	
 
 			asap.SetControlPts(vec_next_pts[i], vec_now_pts[i], vec_global_homo[i].inv());
 
-			asap.Solve();
+			timer_solve.Start();
+			//asap.Solve();
+			timer_solve.Pause();
 			// asap.PrintVertex();
+
+			timer_jacobi.Start();
+			asap.IterativeSolve(10);
+			timer_jacobi.Pause();
+
+//			return 0;
 
 			asap.SolvePoints(preCellPoints, curCellPoints);
 			allCellPoints.push_back(curCellPoints);

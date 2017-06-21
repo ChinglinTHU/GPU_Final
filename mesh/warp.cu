@@ -147,6 +147,16 @@ __global__ void warpImgByVertexGPU(PtrStepSz<uchar3> const img, PtrStepSz<uchar3
 			shared_warppt0[idx+1] = warppt0[idx+1];
 		}	
 	}
+
+	__shared__ float shared_Phinv[576];
+	__shared__ float shared_CH[576];
+	idx = threadIdx.y * blockDim.x + threadIdx.x;
+	if (idx < 576)
+	{
+		shared_Phinv[idx] = Phinv[idx];
+		shared_CH[idx] = CH[idx];
+	}
+
 	__syncthreads();
 
 	if (x < img.cols && y <= img.rows)
@@ -158,9 +168,9 @@ __global__ void warpImgByVertexGPU(PtrStepSz<uchar3> const img, PtrStepSz<uchar3
 		if (cellindex < 0)
 			return;
 
-		float warpTx = Phinv[9*cellindex+0]*ptx + Phinv[9*cellindex+1]*pty + Phinv[9*cellindex+2]*1.f;
-		float warpTy = Phinv[9*cellindex+3]*ptx + Phinv[9*cellindex+4]*pty + Phinv[9*cellindex+5]*1.f;
-		float warpTz = Phinv[9*cellindex+6]*ptx + Phinv[9*cellindex+7]*pty + Phinv[9*cellindex+8]*1.f;
+		float warpTx = shared_Phinv[9*cellindex+0]*ptx + shared_Phinv[9*cellindex+1]*pty + shared_Phinv[9*cellindex+2]*1.f;
+		float warpTy = shared_Phinv[9*cellindex+3]*ptx + shared_Phinv[9*cellindex+4]*pty + shared_Phinv[9*cellindex+5]*1.f;
+		float warpTz = shared_Phinv[9*cellindex+6]*ptx + shared_Phinv[9*cellindex+7]*pty + shared_Phinv[9*cellindex+8]*1.f;
 		warpTx = warpTx / warpTz;
 		warpTy = warpTy / warpTz;
 
@@ -168,9 +178,9 @@ __global__ void warpImgByVertexGPU(PtrStepSz<uchar3> const img, PtrStepSz<uchar3
 
 		if (cellindex < 0)
 			return;
-		float warpTx2 = CH[9*cellindex+0]*warpTx + CH[9*cellindex+1]*warpTy + CH[9*cellindex+2]*1.f;
-		float warpTy2 = CH[9*cellindex+3]*warpTx + CH[9*cellindex+4]*warpTy + CH[9*cellindex+5]*1.f;
-		float warpTz2 = CH[9*cellindex+6]*warpTx + CH[9*cellindex+7]*warpTy + CH[9*cellindex+8]*1.f;
+		float warpTx2 = shared_CH[9*cellindex+0]*warpTx + shared_CH[9*cellindex+1]*warpTy + shared_CH[9*cellindex+2]*1.f;
+		float warpTy2 = shared_CH[9*cellindex+3]*warpTx + shared_CH[9*cellindex+4]*warpTy + shared_CH[9*cellindex+5]*1.f;
+		float warpTz2 = shared_CH[9*cellindex+6]*warpTx + shared_CH[9*cellindex+7]*warpTy + shared_CH[9*cellindex+8]*1.f;
 		warpTx2 = warpTx2 / warpTz2;
 		warpTy2 = warpTy2 / warpTz2;
 
@@ -182,18 +192,23 @@ __global__ void warpImgByVertexGPU(PtrStepSz<uchar3> const img, PtrStepSz<uchar3
 		if (floorx > img.cols-1 || floorx+1 < 0 || floory > img.rows-1 || floory+1 < 0)
 			return;
 		
-		float b = (1-deltax)*(1-deltay)*float(img(floory, floorx).x) 
-				+ (1-deltax)*(deltay)  *float(img(floory+1, floorx).x)
-				+ (deltax)*(deltay)    *float(img(floory+1, floorx+1).x)
-				+ (deltax)*(1-deltay)  *float(img(floory, floorx+1).x);
-		float g = (1-deltax)*(1-deltay)*float(img(floory, floorx).y) 
-				+ (1-deltax)*(deltay)  *float(img(floory+1, floorx).y)
-				+ (deltax)*(deltay)    *float(img(floory+1, floorx+1).y)
-				+ (deltax)*(1-deltay)  *float(img(floory, floorx+1).y);
-		float r = (1-deltax)*(1-deltay)*float(img(floory, floorx).z) 
-				+ (1-deltax)*(deltay)  *float(img(floory+1, floorx).z)
-				+ (deltax)*(deltay)    *float(img(floory+1, floorx+1).z)
-				+ (deltax)*(1-deltay)  *float(img(floory, floorx+1).z);
+		uchar3 color00 = img(floory, floorx);
+		uchar3 color10 = img(floory+1, floorx);
+		uchar3 color01 = img(floory, floorx+1);
+		uchar3 color11 = img(floory+1, floorx+1);
+
+		float b = (1-deltax)*(1-deltay)*float(color00.x) 
+				+ (1-deltax)*(deltay)  *float(color10.x)
+				+ (deltax)*(deltay)    *float(color11.x)
+				+ (deltax)*(1-deltay)  *float(color01.x);
+		float g = (1-deltax)*(1-deltay)*float(color00.y) 
+				+ (1-deltax)*(deltay)  *float(color10.y)
+				+ (deltax)*(deltay)    *float(color11.y)
+				+ (deltax)*(1-deltay)  *float(color01.y);
+		float r = (1-deltax)*(1-deltay)*float(color00.z) 
+				+ (1-deltax)*(deltay)  *float(color10.z)
+				+ (deltax)*(deltay)    *float(color11.z)
+				+ (deltax)*(1-deltay)  *float(color01.z);
 		b = b > 255 ? 255 : b;
 		b = b < 0 ? 0 : b;
 		g = g > 255 ? 255 : g;
