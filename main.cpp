@@ -113,9 +113,10 @@ int main(int argc, const char **argv)
 		vector<Point2f> points[2];
 		vector<Point2f> now_pts, next_pts;
 
+		printf("Detecting feature: ");
 		for (int t = 0; t < gray_frames.size(); t++)
 		{
-			printf("Detecting feature: %d \n", t);
+			//printf("Detecting feature: %d \n", t);
 			if (getfeature)
 			{
 				goodFeaturesToTrack(gray_frames[t], now_pts, MAX_COUNT, 0.01, 10, Mat(), 3, 0, 0.04);
@@ -140,7 +141,7 @@ int main(int argc, const char **argv)
 	   				}
 	   			if (now_pts.size() != next_pts.size())
 	   			   	throw runtime_error("matching points have different size\n");
-	   			printf("\t(ransac_num = %d)\n", now_pts.size());
+	   			//printf("\t(ransac_num = %d)\n", now_pts.size());
 	   			
 	   			vec_now_pts.push_back(now_pts);
 	   			vec_next_pts.push_back(next_pts);
@@ -180,12 +181,12 @@ int main(int argc, const char **argv)
 
 		Timer timer_jacobi, timer_solve;
 		
-
+		printf("Computing frame Homographies: ");
 		for (int i = 0; i < vec_now_pts.size(); i++)
 		// for (int i = 0; i < 10; i++)
 		{
 			asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 3); 
-			printf("Computing frame Homographies (%d, %d) \n", i, i+1);	
+			//printf("Computing frame Homographies (%d, %d) \n", i, i+1);	
 
 			asap.SetControlPts(vec_next_pts[i], vec_now_pts[i], vec_global_homo[i].inv());
 
@@ -240,25 +241,27 @@ int main(int argc, const char **argv)
 		asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 1); 
 		warp W(asap);
 
+		/*
+		BundleHomo Identity(width-1, vector<Mat> (height-1));
+		for (int i = 0; i < width-1; i++)
+			for (int j = 0; j < height-1; j++)
+			{
+				Identity[i][j] = Mat::eye(3, 3, CV_32FC1);
+			}
+		*/
+
+		printf("Image Synthesis: ");
 		for (int t = 0; t < min(1000, allpath.time); t++)
 		{
 			
-			printf("Image Synthesis %d \n", t);
+			// printf("Image Synthesis %d \n", t);
 			///* my new warpimg method
 			Mat warp_frame;
-
-			BundleHomo Identity(width-1, vector<Mat> (height-1));
-			for (int i = 0; i < width-1; i++)
-				for (int j = 0; j < height-1; j++)
-				{
-					Identity[i][j] = Mat::eye(3, 3, CV_32FC1);
-				}
 
 			// W.warpImageMesh(frames[t], warp_frame, allpath.getPath(t), Identity);
 			// W.warpImageMesh(frames[t], warp_frame, allpath.getPath(t), allpath.getOptimizedPath(t));
 			// W.warpImageMeshGPU(frames[t], warp_frame, allpath.getPath(t), allpath.getOptimizedPath(t));
 			W.warpImageMeshbyVertexGPU(frames[t], warp_frame, allpath.getcellPoints(t), allpath.getoptPoints(t));
-			
 			warp_frames.push_back(warp_frame);
 
 			/*
@@ -278,9 +281,10 @@ int main(int argc, const char **argv)
 
 		timer_count.Reset();
 		timer_count.Start();
+		printf("Write images: ");
 		for (int t = 0; t < warp_frames.size(); t++)
 		{
-			printf("Write images %d \n", t);
+			// printf("Write images %d \n", t);
 			/* write images */
 			char str[20];
 			Mat frame_warp = Mat::zeros(frames[t].rows + warp_frames[t].rows, frames[t].cols, CV_8UC3);

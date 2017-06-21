@@ -17,6 +17,7 @@
 
 #include "warp.h"
 #include "../utils/SyncedMemory.h"
+#include "../utils/Timer.h"
 
 using namespace std;
 using namespace cv;
@@ -252,7 +253,6 @@ void warp::compute_homo(float *C, const vector<Point2f> &pts, const vector<Point
 
 void warp::warpImageMeshbyVertexGPU(Mat img, Mat & warpimg, vector<Point2f>  warpPts0, vector<Point2f>  warpPtsT)
 {
-
 	float *Pinv = new float[(width-1)*(height-1)*9];
  	compute_homo(Pinv, cellPtsT, warpPtsT);
 	float *C = new float[(width-1)*(height-1)*9];
@@ -282,7 +282,6 @@ void warp::warpImageMeshbyVertexGPU(Mat img, Mat & warpimg, vector<Point2f>  war
 	cudaMemcpy(Pinv_device, Pinv,  M*9*sizeof(float), cudaMemcpyHostToDevice);
 	cudaMemcpy(C_device,    C,     M*9*sizeof(float), cudaMemcpyHostToDevice);
 
-
 	const int BLOCK_WIDTH = 32;
 	const int BLOCK_HEIGHT = 32;
 	const int X_BLOCK_NUM = (img.cols-1)/BLOCK_WIDTH + 1;
@@ -304,8 +303,10 @@ void warp::warpImageMeshbyVertexGPU(Mat img, Mat & warpimg, vector<Point2f>  war
 		cerr << "pointNum must equal to the given number 81 in the cuda code, need to modify the cuda code" << endl;
 		return;
 	}
+
 	warpImgByVertexGPU<<< block, thread >>>(img_device, warpimg_device, ptrT_mat, warp0_mat, 
 											Pinv_device, C_device, width-1, height-1, N);
+
 	warpimg_device.download(warpimg);
 
 	/* imshow
