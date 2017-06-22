@@ -312,9 +312,9 @@ int main(int argc, const char **argv)
 		timer_count.Pause();
 		printf_timer(timer_count);	
 
-		SmoothCut(vec_minx, vec_maxx, vec_miny, vec_maxy);
+		//SmoothCut(vec_minx, vec_maxx, vec_miny, vec_maxy);
 
-		/*
+		///*
 		int minx = cutxy[0];
 		int maxx = cutxy[1];
 		int miny = cutxy[2];
@@ -345,7 +345,7 @@ int main(int argc, const char **argv)
 		sizey = maxy-miny+1;
 
 		cout << "Resize rate: " << float (sizex*sizey) / float(frames[0].rows*frames[0].cols) << endl;
-		*/
+		//*/
 
 		timer_count.Reset();
 		timer_count.Start();
@@ -355,7 +355,7 @@ int main(int argc, const char **argv)
 		{
 			// printf("Write images %d \n", t);
 			/* cut image and resize */
-			///*
+			/*
 
 			int minx = vec_minx[t];
 			int maxx = vec_maxx[t];
@@ -391,10 +391,9 @@ int main(int argc, const char **argv)
 				rate = float (sizex*sizey) / float(frames[t].rows*frames[t].cols);
 
 			cout << "Resize rate " << t << ": " << float (sizex*sizey) / float(frames[t].rows*frames[t].cols) << endl;
-
+			//*/
 			Mat cutimg;
 			resize(warp_frames[t](Rect(minx, miny, sizex, sizey)), cutimg, frames[t].size());
-			//*/
 
 			/* write images */
 			char str[20];
@@ -405,7 +404,7 @@ int main(int argc, const char **argv)
 			sprintf(str, "result/frame_warp_%03d.jpg", t);
 			imwrite(str, frame_warp);
 		}
-		cout << "min cut rate = " << rate << endl;
+		//cout << "min cut rate = " << rate << endl;
 		timer_count.Pause();
 		printf_timer(timer_count);
 
