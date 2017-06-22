@@ -52,7 +52,7 @@ warp::warp(asapWarp asap)
 
 warp::~warp(){}
 
-__device__ int findCell(const float* point, const float x, const float y, const int pointNum, 
+__host__ __device__ int findCell(const float* point, const float x, const float y, const int pointNum, 
 						const int cellwidth, const int cellheight)
 {
 	float minx, maxx, miny, maxy;
@@ -126,6 +126,55 @@ __device__ int findCell(const float* point, const float x, const float y, const 
 
 	return -1;
 }
+
+/*
+void findCut(float *cutxy,  vector<Point2f> warpPts0, float* warpT, float *Pinv, float *C, const int cellwidth, const int cellheight, const int pointNum)
+{
+	vector<Point2f> boundary;
+
+	for (int i = 0; i < width; i++)
+	{
+		boundary.push_back(warpPts0[index(i, 0)]);
+		boundary.push_back(warpPts0[index(i, height-1)]);
+	}
+	for (int j = 1; j < height-1; j++)
+	{
+		boundary.push_back(warpPts0[index(0, j)]);
+		boundary.push_back(warpPts0[index(width-1, j)]);
+	}
+	// minx, maxx, miny, maxy : cutxy
+	for (int i = 0; i < boundary.size(); i++)
+	{
+		float ptx = boundary[i].x;
+		float pty = boundary[i].y;
+		int cellindex = findCell(warpT, ptx, pty, pointNum, cellwidth, cellheight);
+
+		if (cellindex < 0)
+			return;
+
+		float warpTx = shared_Phinv[9*cellindex+0]*ptx + shared_Phinv[9*cellindex+1]*pty + shared_Phinv[9*cellindex+2]*1.f;
+		float warpTy = shared_Phinv[9*cellindex+3]*ptx + shared_Phinv[9*cellindex+4]*pty + shared_Phinv[9*cellindex+5]*1.f;
+		float warpTz = shared_Phinv[9*cellindex+6]*ptx + shared_Phinv[9*cellindex+7]*pty + shared_Phinv[9*cellindex+8]*1.f;
+		warpTx = warpTx / warpTz;
+		warpTy = warpTy / warpTz;
+
+		cellindex = findCell(shared_warppt0, warpTx, warpTy, pointNum, cellwidth, cellheight);
+
+		if (cellindex < 0)
+			return;
+		float warpTx2 = shared_CH[9*cellindex+0]*warpTx + shared_CH[9*cellindex+1]*warpTy + shared_CH[9*cellindex+2]*1.f;
+		float warpTy2 = shared_CH[9*cellindex+3]*warpTx + shared_CH[9*cellindex+4]*warpTy + shared_CH[9*cellindex+5]*1.f;
+		float warpTz2 = shared_CH[9*cellindex+6]*warpTx + shared_CH[9*cellindex+7]*warpTy + shared_CH[9*cellindex+8]*1.f;
+		warpTx2 = warpTx2 / warpTz2;
+		warpTy2 = warpTy2 / warpTz2;
+
+		int floorx = int(warpTx2);
+		int floory = int(warpTy2);
+		float deltax = warpTx2-float(floorx);
+		float deltay = warpTy2-float(floory);
+	}
+}
+*/
 
 __global__ void warpImgByVertexGPU(PtrStepSz<uchar3> const img, PtrStepSz<uchar3> warpimg, 
 						const float* ptT, const float* warppt0, const float* Phinv, const float* CH, 
@@ -224,6 +273,76 @@ __global__ void warpImgByVertexGPU(PtrStepSz<uchar3> const img, PtrStepSz<uchar3
 	}
 }
 
+void warp::findCut(Mat img, int* cutxy)
+{
+	int minx = 0;
+	int miny = 0;
+	int maxx = img.cols-1;
+	int maxy = img.rows-1;
+	uchar zero = uchar(0);
+
+	for (int x = img.cols/10; x < img.cols*9/10; x++)
+	{
+		for (int y = 0; y < img.rows / 4; y++)
+		{
+			//printf("img.at<uchar3>(%d, %d) = (%u, %u, %u)\n", y, x, img.at<uchar3>(y, x).x, img.at<uchar3>(y, x).y, img.at<uchar3>(y, x).z);
+			if (img.at<uchar3>(y, x).x != zero || img.at<uchar3>(y, x).y != zero || img.at<uchar3>(y, x).z != zero)
+			{
+				if (miny < y)
+					miny = y;
+				break;
+			}
+		}
+		for (int y = img.rows-1; y > img.rows / 4; y--)
+		{
+			//printf("img.at<uchar3>(%d, %d) = (%u, %u, %u)\n", y, x, img.at<uchar3>(y, x).x, img.at<uchar3>(y, x).y, img.at<uchar3>(y, x).z);
+			if (img.at<uchar3>(y, x).x != zero || img.at<uchar3>(y, x).y != zero || img.at<uchar3>(y, x).z != zero)
+			{
+				if (maxy > y)
+					maxy = y;
+				break;
+			}
+		}
+	}
+
+	for (int y = img.rows/10; y < img.rows*9/10; y++)
+	{
+		for (int x = 0; x < img.cols / 4; x++)
+		{
+			if (img.at<uchar3>(y, x).x != zero || img.at<uchar3>(y, x).y != zero || img.at<uchar3>(y, x).z != zero)
+			{
+				if (minx < x)
+					minx = x;
+				break;
+			}
+		}
+		for (int x = img.cols-1; x > img.cols / 4; x--)
+		{
+			if (img.at<uchar3>(y, x).x != zero || img.at<uchar3>(y, x).y != zero || img.at<uchar3>(y, x).z != zero)
+			{
+				if (maxx > x)
+					maxx = x;
+				break;
+			}
+		}
+	}
+
+	cutxy[0] = minx;
+	cutxy[1] = maxx;
+	cutxy[2] = miny;
+	cutxy[3] = maxy;
+
+	/*
+	cout << "minx = " << minx << endl;
+	cout << "maxx = " << maxx << endl;
+	cout << "miny = " << miny << endl;
+	cout << "maxy = " << maxy << endl;
+	//*/
+
+	// resize(img(Rect(minx, miny, sizex, sizey)), cutimg, img.size());
+	return;
+}
+
 void warp::compute_homo(float *C, const vector<Point2f> &pts, const vector<Point2f> &warpPts)
 {
 	for (int i = 0; i < width-1; i++)
@@ -251,7 +370,7 @@ void warp::compute_homo(float *C, const vector<Point2f> &pts, const vector<Point
 		}
 }
 
-void warp::warpImageMeshbyVertexGPU(Mat img, Mat & warpimg, vector<Point2f>  warpPts0, vector<Point2f>  warpPtsT)
+void warp::warpImageMeshbyVertexGPU(Mat img, Mat & warpimg, vector<Point2f> warpPts0, vector<Point2f> warpPtsT, int * cutxy)
 {
 	float *Pinv = new float[(width-1)*(height-1)*9];
  	compute_homo(Pinv, cellPtsT, warpPtsT);
@@ -306,12 +425,16 @@ void warp::warpImageMeshbyVertexGPU(Mat img, Mat & warpimg, vector<Point2f>  war
 
 	warpImgByVertexGPU<<< block, thread >>>(img_device, warpimg_device, ptrT_mat, warp0_mat, 
 											Pinv_device, C_device, width-1, height-1, N);
-
 	warpimg_device.download(warpimg);
 
+	// minx, maxx, miny, maxy
+
+	// void findCut(float *cutxy, float* warpT, float *warp0, float *Pinv, float *C, const int cellwidth, const int cellheight, const int pointNum)
+	findCut(warpimg, cutxy);
+
 	/* imshow
-	namedWindow("warpimg", WINDOW_AUTOSIZE);
-	imshow("warpimg", warpimg);
+	namedWindow("cutimg", WINDOW_AUTOSIZE);
+	imshow("cutimg", cutimg);
 	waitKey(0);
 	//*/
 

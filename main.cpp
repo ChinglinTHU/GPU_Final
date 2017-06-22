@@ -50,7 +50,7 @@ double outputFps;
 string outputPath;
 bool quietMode;
 
-
+void SmoothCut(vector<int> & vec_minx, vector<int> & vec_maxx, vector<int> & vec_miny, vector<int> & vec_maxy);
 void matches2points(const vector<KeyPoint>& train, const vector<KeyPoint>& query,
         const std::vector<cv::DMatch>& matches, std::vector<cv::Point2f>& pts_train,
         std::vector<Point2f>& pts_query);
@@ -235,12 +235,6 @@ int main(int argc, const char **argv)
 		// Warp image
 		vector<Mat> warp_frames;
 		Mat globalH = Mat::eye(3, 3, CV_64FC1);
-		
-		timer_count.Reset();
-		timer_count.Start();
-		asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 1); 
-		warp W(asap);
-
 		/*
 		BundleHomo Identity(width-1, vector<Mat> (height-1));
 		for (int i = 0; i < width-1; i++)
@@ -250,10 +244,19 @@ int main(int argc, const char **argv)
 			}
 		*/
 
+
+		timer_count.Reset();
+		timer_count.Start();
+		asapWarp asap = asapWarp(height, width, cuth+1, cutw+1, 1); 
+		warp W(asap);
+		int cutxy[4] = {0};
+		int nowcutxy[4];
 		printf("Image Synthesis: ");
+		vector<int> vec_minx, vec_maxx, vec_miny, vec_maxy;
 		for (int t = 0; t < min(1000, allpath.time); t++)
 		{
-			
+			//if (t < 200)
+			//	continue;
 			// printf("Image Synthesis %d \n", t);
 			///* my new warpimg method
 			Mat warp_frame;
@@ -261,8 +264,38 @@ int main(int argc, const char **argv)
 			// W.warpImageMesh(frames[t], warp_frame, allpath.getPath(t), Identity);
 			// W.warpImageMesh(frames[t], warp_frame, allpath.getPath(t), allpath.getOptimizedPath(t));
 			// W.warpImageMeshGPU(frames[t], warp_frame, allpath.getPath(t), allpath.getOptimizedPath(t));
-			W.warpImageMeshbyVertexGPU(frames[t], warp_frame, allpath.getcellPoints(t), allpath.getoptPoints(t));
+			W.warpImageMeshbyVertexGPU(frames[t], warp_frame, allpath.getcellPoints(t), allpath.getoptPoints(t), nowcutxy);
 			warp_frames.push_back(warp_frame);
+			/*
+			cout << "time: " << t << endl;
+			cout << "\tminx:  " << nowcutxy[0] << "\tmaxx: " << nowcutxy[1] << endl;
+			cout << "\tminy:  " << nowcutxy[2] << "\tmaxy: " << nowcutxy[3] << endl;
+			*/
+
+			// minx, maxx, miny, maxy
+			vec_minx.push_back(nowcutxy[0]);
+			vec_maxx.push_back(nowcutxy[1]);
+			vec_miny.push_back(nowcutxy[2]);
+			vec_maxy.push_back(nowcutxy[3]);
+			if (t == 0)
+			{
+				cutxy[0] = nowcutxy[0];
+				cutxy[1] = nowcutxy[1];
+				cutxy[2] = nowcutxy[2];
+				cutxy[3] = nowcutxy[3];
+			}
+			else
+			{
+				if (cutxy[0] < nowcutxy[0])
+					cutxy[0] = nowcutxy[0];
+				if (cutxy[1] > nowcutxy[1])
+					cutxy[1] = nowcutxy[1];
+				if (cutxy[2] < nowcutxy[2])
+					cutxy[2] = nowcutxy[2];
+				if (cutxy[3] > nowcutxy[3])
+					cutxy[3] = nowcutxy[3];
+			}
+
 
 			/*
 			printf("Write images %d \n", t);
@@ -277,23 +310,102 @@ int main(int argc, const char **argv)
 			//*/
 		}
 		timer_count.Pause();
-		printf_timer(timer_count);		
+		printf_timer(timer_count);	
+
+		SmoothCut(vec_minx, vec_maxx, vec_miny, vec_maxy);
+
+		/*
+		int minx = cutxy[0];
+		int maxx = cutxy[1];
+		int miny = cutxy[2];
+		int maxy = cutxy[3];
+		int sizex = maxx-minx+1;
+		int sizey = maxy-miny+1;
+		float cutw_h = float(sizex) / float(sizey);
+		float w_h = float(frames[0].cols) / float(frames[0].rows);
+
+		if (cutw_h < w_h)
+		{
+			int truey = floor(sizex / w_h);
+			miny -= (truey - sizey)/2;
+			maxy += (truey - sizey)/2;
+			miny = miny < 0 ? 0 : miny;
+			maxy = maxy > frames[0].rows-1 ? frames[0].rows-1 : maxy;
+		}
+		else
+		{
+			int truex = floor(w_h*sizey);
+			minx -= (truex - sizex)/2;
+			maxx += (truex - sizex)/2;
+			minx = minx < 0 ? 0 : minx;
+			maxx = maxx > frames[0].cols-1 ? frames[0].cols-1 : maxx;
+		}
+
+		sizex = maxx-minx+1;
+		sizey = maxy-miny+1;
+
+		cout << "Resize rate: " << float (sizex*sizey) / float(frames[0].rows*frames[0].cols) << endl;
+		*/
 
 		timer_count.Reset();
 		timer_count.Start();
+		float rate = 0.f;
 		printf("Write images: ");
 		for (int t = 0; t < warp_frames.size(); t++)
 		{
 			// printf("Write images %d \n", t);
+			/* cut image and resize */
+			///*
+
+			int minx = vec_minx[t];
+			int maxx = vec_maxx[t];
+			int miny = vec_miny[t];
+			int maxy = vec_maxy[t];
+			int sizex = maxx-minx+1;
+			int sizey = maxy-miny+1;
+			float cutw_h = float(sizex) / float(sizey);
+			float w_h = float(frames[t].cols) / float(frames[t].rows);
+
+			if (cutw_h < w_h)
+			{
+				int truey = floor(sizex / w_h);
+				miny -= (truey - sizey)/2;
+				maxy += (truey - sizey)/2;
+				miny = miny < 0 ? 0 : miny;
+				maxy = maxy > frames[t].rows-1 ? frames[t].rows-1 : maxy;
+			}
+			else
+			{
+				int truex = floor(w_h*sizey);
+				minx -= (truex - sizex)/2;
+				maxx += (truex - sizex)/2;
+				minx = minx < 0 ? 0 : minx;
+				maxx = maxx > frames[t].cols-1 ? frames[t].cols-1 : maxx;
+			}
+
+			sizex = maxx-minx+1;
+			sizey = maxy-miny+1;
+			if (t == 0)
+				rate = float (sizex*sizey) / float(frames[t].rows*frames[t].cols);
+			else if (rate > float (sizex*sizey) / float(frames[t].rows*frames[t].cols))
+				rate = float (sizex*sizey) / float(frames[t].rows*frames[t].cols);
+
+			cout << "Resize rate " << t << ": " << float (sizex*sizey) / float(frames[t].rows*frames[t].cols) << endl;
+
+			Mat cutimg;
+			resize(warp_frames[t](Rect(minx, miny, sizex, sizey)), cutimg, frames[t].size());
+			//*/
+
 			/* write images */
 			char str[20];
-			Mat frame_warp = Mat::zeros(frames[t].rows + warp_frames[t].rows, frames[t].cols, CV_8UC3);
+			Mat frame_warp = Mat::zeros(frames[t].rows + cutimg.rows, frames[t].cols, CV_8UC3);
 			frames[t].copyTo(frame_warp(Rect(0, 0, frames[t].cols, frames[t].rows)));
-			warp_frames[t].copyTo(frame_warp(Rect(0, frames[t].rows, warp_frames[t].cols, warp_frames[t].rows)));
+			cutimg.copyTo(frame_warp(Rect(0, frames[t].rows, cutimg.cols, cutimg.rows)));
 
 			sprintf(str, "result/frame_warp_%03d.jpg", t);
 			imwrite(str, frame_warp);
 		}
+		cout << "min cut rate = " << rate << endl;
 		timer_count.Pause();
 		printf_timer(timer_count);
 
@@ -330,3 +442,139 @@ void matches2points(const vector<KeyPoint>& query, const vector<KeyPoint>& train
         }
 
     }
+
+void SmoothCut(vector<int> & minx, vector<int> & maxx, vector<int> & miny, vector<int> & maxy)
+{
+
+	vector<int> modifyminx, modifyminy, modifymaxx, modifymaxy;
+	modifyminx = minx;
+
+	int n;
+
+	for (int k = 0; k < 10; k++)
+	{
+		for (int i = 0; i < int(modifyminx.size())-1; i++)
+		{
+		    if (abs(modifyminx[i]-modifyminx[i+1]) > 1)
+		    {	
+		        n = abs(modifyminx[i]-modifyminx[i+1]);
+		        if (modifyminx[i+1] > modifyminx[i])
+		        {
+		            for (int j = i+1; j >= max(i+1-n, 0); j--)
+		            {
+		                modifyminx[j] = modifyminx[i+1]-(i+1)+j;
+		                if (modifyminx[j] < minx[j])
+		                    modifyminx[j] = minx[j];
+		            }
+		        }
+		        else
+		        {
+		            for (int j = i; j <= min(i+n, int(modifyminx.size())-1); j++)
+		            {
+		                modifyminx[j] = modifyminx[i]+i-j;
+		                if (modifyminx[j] < minx[j])
+		                    modifyminx[j] = minx[j];
+		            }
+		        }
+		    }
+		}
+		minx = modifyminx;
+	}
+
+	modifyminy = miny;
+
+	for (int k = 0; k < 10; k++)
+	{
+		for (int i = 0; i < int(modifyminy.size())-1; i++)
+		{
+		    if (abs(modifyminy[i]-modifyminy[i+1]) > 1)
+		    {	
+		        n = abs(modifyminy[i]-modifyminy[i+1]);
+		        if (modifyminy[i+1] > modifyminy[i])
+		        {
+		            for (int j = i+1; j >= max(i+1-n, 0); j--)
+		            {
+		                modifyminy[j] = modifyminy[i+1]-(i+1)+j;
+		                if (modifyminy[j] < miny[j])
+		                    modifyminy[j] = miny[j];
+		            }
+		        }
+		        else
+		        {
+		            for (int j = i; j <= min(i+n, int(modifyminy.size())-1); j++)
+		            {
+		                modifyminy[j] = modifyminy[i]+i-j;
+		                if (modifyminy[j] < miny[j])
+		                    modifyminy[j] = miny[j];
+		            }
+		        }
+		    }
+		}
+		miny = modifyminy;
+	}
+
+	modifymaxx = maxx;
+
+	for (int k = 0; k < 10; k++)
+	{
+		for (int i = 0; i < int(modifymaxx.size())-1; i++)
+		{
+		    if (abs(modifymaxx[i]-modifymaxx[i+1]) > 1)
+		    {	
+		        n = abs(modifymaxx[i]-modifymaxx[i+1]);
+		        if (modifymaxx[i+1] < modifymaxx[i])
+		        {
+		            for (int j = i+1; j >= max(i+1-n, 0); j--)
+		            {
+		                modifymaxx[j] = modifymaxx[i+1]+(i+1)-j;
+		                if (modifymaxx[j] > maxx[j])
+		                    modifymaxx[j] = maxx[j];
+		            }
+		        }
+		        else
+		        {
+		            for (int j = i; j <= min(i+n, int(modifymaxx.size())-1); j++)
+		            {
+		                modifymaxx[j] = modifymaxx[i]+j-(i);
+		                if (modifymaxx[j] > maxx[j])
+		                    modifymaxx[j] = maxx[j];
+		            }
+		        }
+		    }
+		}
+		maxx = modifymaxx;
+	}
+
+	modifymaxy = maxy;
+
+	for (int k = 0; k < 10; k++)
+	{
+		for (int i = 0; i < int(modifymaxy.size())-1; i++)
+		{
+		    if (abs(modifymaxy[i]-modifymaxy[i+1]) > 1)
+		    {	
+		        n = abs(modifymaxy[i]-modifymaxy[i+1]);
+		        if (modifymaxy[i+1] < modifymaxy[i])
+		        {
+		            for (int j = i+1; j >= max(i+1-n, 0); j--)
+		            {
+		                modifymaxy[j] = modifymaxy[i+1]+(i+1)-j;
+		                if (modifymaxy[j] > maxy[j])
+		                    modifymaxy[j] = maxy[j];
+		            }
+		        }
+		        else
+		        {
+		            for (int j = i; j <= min(i+n, int(modifymaxy.size())-1); j++)
+		            {
+		                modifymaxy[j] = modifymaxy[i]+j-(i);
+		                if (modifymaxy[j] > maxy[j])
+		                    modifymaxy[j] = maxy[j];
+		            }
+		        }
+		    }
+		}
+		maxy = modifymaxy;
+	}
+
+}

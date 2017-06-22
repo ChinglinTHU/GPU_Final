@@ -348,9 +348,9 @@ void allPath::jacobiSolver(int iter)
 {
 	float lambda = 5.0; // TODO: need to optimize
 	float cellsize = height*width;
+	cout << "iter time:" << iter << endl;
 	for(int it = 0; it < iter; it++)
 	{
-		cout<<"iter time:"<<it+1<<endl;
 		for(int t = 0; t < time; t++)
 		{
 			int sta_t, end_t;
