@@ -347,6 +347,7 @@ int main(int argc, const char **argv)
 		cout << "Resize rate: " << float (sizex*sizey) / float(frames[0].rows*frames[0].cols) << endl;
 		//*/
 
+		vector<Mat> cut_frames;
 		timer_count.Reset();
 		timer_count.Start();
 		float rate = 0.f;
@@ -394,6 +395,7 @@ int main(int argc, const char **argv)
 			//*/
 			Mat cutimg;
 			resize(warp_frames[t](Rect(minx, miny, sizex, sizey)), cutimg, frames[t].size());
+			cut_frames.push_back(cutimg);
 
 			/* write images */
 			char str[20];
@@ -407,6 +409,31 @@ int main(int argc, const char **argv)
 		//cout << "min cut rate = " << rate << endl;
 		timer_count.Pause();
 		printf_timer(timer_count);
+
+
+
+		string::size_type pAt = inputPath.find_last_of('.');
+		const string NAME = inputPath.substr(0, pAt) + "_stab" + inputPath.substr(pAt, inputPath.size() - pAt+1);
+		cout << "write video to " << NAME << endl;
+		Size S = cut_frames[0].size();
+
+		VideoWriter outputVideo;  
+		outputVideo.open(NAME, VideoWriter::fourcc('X','V','I','D'), outputFps, S, true);
+		if (!outputVideo.isOpened())
+	    {
+	        cout  << "Could not open the output video for write: " << NAME << endl;
+	        return -1;
+	    }
+
+		timer_count.Reset();
+		timer_count.Start();
+		printf("Write video: "); 
+		for (int t = 0; t < cut_frames.size(); t++)
+		{
+			outputVideo.write(cut_frames[t]);
+		}
+		timer_count.Pause();
+		printf_timer(timer_count); 
 
 	}
 	catch (const exception &e)
