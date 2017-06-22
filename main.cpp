@@ -86,7 +86,6 @@ int main(int argc, const char **argv)
 			cur_frame = source->nextFrame();
 			if(cur_frame.empty()) break;
 			cv::cvtColor(cur_frame, gray_frame, CV_BGR2GRAY);
-			// if (s > 9 && s < 20)
 			if (true)
 			{
 				frames.push_back(cur_frame); // TODO: do i need to change its format?
@@ -351,7 +350,7 @@ int main(int argc, const char **argv)
 		timer_count.Reset();
 		timer_count.Start();
 		float rate = 0.f;
-		printf("Write images: ");
+		printf("Cut images: ");
 		for (int t = 0; t < warp_frames.size(); t++)
 		{
 			// printf("Write images %d \n", t);
@@ -396,12 +395,21 @@ int main(int argc, const char **argv)
 			Mat cutimg;
 			resize(warp_frames[t](Rect(minx, miny, sizex, sizey)), cutimg, frames[t].size());
 			cut_frames.push_back(cutimg);
+		}
+		timer_count.Pause();
+		printf_timer(timer_count);
 
-			/* write images */
+		/*
+		timer_count.Reset();
+		timer_count.Start();
+		printf("Write images: ");
+		for (int t = 0; t < cut_frames.size(); t++)
+		{
+			// write images 
 			char str[20];
-			Mat frame_warp = Mat::zeros(frames[t].rows + cutimg.rows, frames[t].cols, CV_8UC3);
+			Mat frame_warp = Mat::zeros(frames[t].rows + cut_frames[t].rows, frames[t].cols, CV_8UC3);
 			frames[t].copyTo(frame_warp(Rect(0, 0, frames[t].cols, frames[t].rows)));
-			cutimg.copyTo(frame_warp(Rect(0, frames[t].rows, cutimg.cols, cutimg.rows)));
+			cut_frames[t].copyTo(frame_warp(Rect(0, frames[t].rows, cut_frames[t].cols, cut_frames[t].rows)));
 
 			sprintf(str, "result/frame_warp_%03d.jpg", t);
 			imwrite(str, frame_warp);
@@ -409,16 +417,14 @@ int main(int argc, const char **argv)
 		//cout << "min cut rate = " << rate << endl;
 		timer_count.Pause();
 		printf_timer(timer_count);
-
+		//*/
 
 
 		string::size_type pAt = inputPath.find_last_of('.');
 		const string NAME = inputPath.substr(0, pAt) + "_stab" + inputPath.substr(pAt, inputPath.size() - pAt+1);
 		cout << "write video to " << NAME << endl;
-		Size S = cut_frames[0].size();
-
 		VideoWriter outputVideo;  
-		outputVideo.open(NAME, VideoWriter::fourcc('X','V','I','D'), outputFps, S, true);
+		outputVideo.open(NAME, VideoWriter::fourcc('X','V','I','D'), outputFps, cut_frames[0].size(), true);
 		if (!outputVideo.isOpened())
 	    {
 	        cout  << "Could not open the output video for write: " << NAME << endl;
