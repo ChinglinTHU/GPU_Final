@@ -87,6 +87,7 @@ int main(int argc, const char **argv)
 			if(cur_frame.empty()) break;
 			cv::cvtColor(cur_frame, gray_frame, CV_BGR2GRAY);
 			if (true)
+			// if (s < 200)
 			{
 				frames.push_back(cur_frame); // TODO: do i need to change its format?
 				gray_frames.push_back(gray_frame);
@@ -167,8 +168,8 @@ int main(int argc, const char **argv)
 		vector<vector<vector<Point2f>>> allCellPoints; // t,i,j
 		vector<vector<Point2f>> preCellPoints(cutw+1, vector<Point2f> (cuth+1));
 		vector<vector<Point2f>> curCellPoints(cutw+1, vector<Point2f> (cuth+1));
-		for(int i = 0; i<cutw+1;i++)
-			for(int j = 0;j<cuth+1;j++)
+		for(int i = 0; i < cutw+1; i++)
+			for(int j = 0; j < cuth+1; j++)
 			{
 				Point2f p = Point2f(float(i*quadWidth), float(j*quadHeight));
 				preCellPoints[i][j] = p;
@@ -192,13 +193,13 @@ int main(int argc, const char **argv)
 			timer_solve.Start();
 			//asap.Solve();
 			timer_solve.Pause();
-			// asap.PrintVertex();
 
 			timer_jacobi.Start();
-			asap.IterativeSolve(10);
+			asap.IterativeSolve(20);
 			timer_jacobi.Pause();
+			//asap.PrintVertex();
 
-//			return 0;
+			//return 0;
 
 			asap.SolvePoints(preCellPoints, curCellPoints);
 			allCellPoints.push_back(curCellPoints);
@@ -254,9 +255,10 @@ int main(int argc, const char **argv)
 		vector<int> vec_minx, vec_maxx, vec_miny, vec_maxy;
 		for (int t = 0; t < min(1000, allpath.time); t++)
 		{
-			//if (t < 200)
+			//if (t < 121)
 			//	continue;
-			// printf("Image Synthesis %d \n", t);
+			//printf("Image Synthesis %d \n", t);
+
 			///* my new warpimg method
 			Mat warp_frame;
 
@@ -265,11 +267,13 @@ int main(int argc, const char **argv)
 			// W.warpImageMeshGPU(frames[t], warp_frame, allpath.getPath(t), allpath.getOptimizedPath(t));
 			W.warpImageMeshbyVertexGPU(frames[t], warp_frame, allpath.getcellPoints(t), allpath.getoptPoints(t), nowcutxy);
 			warp_frames.push_back(warp_frame);
-			/*
+			///*
 			cout << "time: " << t << endl;
 			cout << "\tminx:  " << nowcutxy[0] << "\tmaxx: " << nowcutxy[1] << endl;
 			cout << "\tminy:  " << nowcutxy[2] << "\tmaxy: " << nowcutxy[3] << endl;
-			*/
+			//*/
+
+
 
 			// minx, maxx, miny, maxy
 			vec_minx.push_back(nowcutxy[0]);
@@ -318,6 +322,7 @@ int main(int argc, const char **argv)
 		int maxx = cutxy[1];
 		int miny = cutxy[2];
 		int maxy = cutxy[3];
+		cout << "origin cut: " << "x - (" << minx << ", " << maxx << "), y - (" << miny << ", " << maxy << ")" << endl;
 		int sizex = maxx-minx+1;
 		int sizey = maxy-miny+1;
 		float cutw_h = float(sizex) / float(sizey);
@@ -339,6 +344,14 @@ int main(int argc, const char **argv)
 			minx = minx < 0 ? 0 : minx;
 			maxx = maxx > frames[0].cols-1 ? frames[0].cols-1 : maxx;
 		}
+
+		///* don't cut
+		cout << "don't cut" << endl;
+		cout << "origin cut: " << "x - (" << minx << ", " << maxx << "), y - (" << miny << ", " << maxy << ")" << endl;
+		minx = miny = 0;
+		maxx = frames[0].cols-1;
+		maxy = frames[0].rows-1;
+		//*/
 
 		sizex = maxx-minx+1;
 		sizey = maxy-miny+1;
@@ -399,7 +412,7 @@ int main(int argc, const char **argv)
 		timer_count.Pause();
 		printf_timer(timer_count);
 
-		/*
+		///*
 		timer_count.Reset();
 		timer_count.Start();
 		printf("Write images: ");
@@ -431,6 +444,8 @@ int main(int argc, const char **argv)
 	        return -1;
 	    }
 
+	    /*
+
 		timer_count.Reset();
 		timer_count.Start();
 		printf("Write video: "); 
@@ -440,6 +455,7 @@ int main(int argc, const char **argv)
 		}
 		timer_count.Pause();
 		printf_timer(timer_count); 
+		*/
 
 	}
 	catch (const exception &e)

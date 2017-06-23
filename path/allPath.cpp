@@ -73,7 +73,7 @@ allPath::allPath(int height, int width, int t)
 
 allPath::allPath(int height, int width, int t, vector<vector<vector<Point2f>>> allCellPts)
 {
-	cout<<"allPath init...";
+	cout << "allPath init...";
 	this->height = height;
 	this->width = width;
 	this->time = t;
@@ -108,7 +108,7 @@ allPath::allPath(int height, int width, int t, vector<vector<vector<Point2f>>> a
 	this->tmpPoints = tmpPoints;
 	this->optPoints = optPoints;
 	this->BPath = BPath;
-	cout<<"done"<<endl;
+	cout << "done" << endl;
 }
 
 allPath::~allPath(){}
@@ -471,9 +471,9 @@ void allPath::jacobiPointSolver(int iter)
 {
 	float lambda = 5.0; // TODO: need to optimize
 	float cellsize = (height)*(width);
+	cout << "iter time:" << iter << endl;
 	for(int it = 0; it < iter; it++)
 	{
-		cout<<"iter time:"<<it+1<<endl;
 		for(int t = 0; t < time; t++)
 		{
 			// int sta_t, end_t;
@@ -519,15 +519,15 @@ void allPath::jacobiPointSolver(int iter)
 			// calc weights
 			for (int r = sta_t; r <= end_t; r++)
 			{
-				if(r == t)
-				{
-					w[r-sta_t] = 0.0;
-					continue;
-				}
-				float trans = (abs(cellPoints[i][j][r].x - cellPoints[i][j][t].x) + 
-								abs(cellPoints[i][j][r].y - cellPoints[i][j][t].y))/1000.0;
+				// if(r == t)
+				// {
+				// 	w[r-sta_t] = 0.0;
+				// 	continue;
+				// }
+				float trans = abs(cellPoints[i][j][r].x - cellPoints[i][j][t].x) + 
+								abs(cellPoints[i][j][r].y - cellPoints[i][j][t].y);
 				// cout<<"trans = "<<trans<<endl;
-				w[r-sta_t] = gaussianD(float(r-t), 10.f)*gaussianD(trans, 1.f);
+				w[r-sta_t] = gaussianD(float(r-t), 10.f);//*gaussianD(trans, 10.f)*10;
 				// cout<<"w[r] = "<<w[r-sta_t]<<endl;
 				w_sum += w[r-sta_t];
 			}
@@ -544,47 +544,46 @@ void allPath::jacobiPointSolver(int iter)
 
 					//3rd cons
 					Point2f cons3(0,0);
-					float wgtBundle = 2.0;
 					int N = 0;
 						if(0<i && i<width-1 && 0<j && j<height-1)
 						{
 							N=8;
 							// tmpPath[i][j][t] += 2*optPath[i-1][j-1][t];
-							cons3 += wgtBundle*optPoints[i-1][j-1][t];
-							cons3 += wgtBundle*optPoints[i-1][j][t];
-							cons3 += wgtBundle*optPoints[i-1][j+1][t];
-							cons3 += wgtBundle*optPoints[i][j-1][t];
-							cons3 += wgtBundle*optPoints[i][j+1][t];
-							cons3 += wgtBundle*optPoints[i+1][j-1][t];
-							cons3 += wgtBundle*optPoints[i+1][j][t];
-							cons3 += wgtBundle*optPoints[i+1][j+1][t];
+							cons3 += 2*optPoints[i-1][j-1][t];
+							cons3 += 2*optPoints[i-1][j][t];
+							cons3 += 2*optPoints[i-1][j+1][t];
+							cons3 += 2*optPoints[i][j-1][t];
+							cons3 += 2*optPoints[i][j+1][t];
+							cons3 += 2*optPoints[i+1][j-1][t];
+							cons3 += 2*optPoints[i+1][j][t];
+							cons3 += 2*optPoints[i+1][j+1][t];
 						}
 						else if(0<i && i<width-1 && j==0)
 						{
 							N=2;
-							cons3 += wgtBundle*optPoints[i-1][j][t];
-							cons3 += wgtBundle*optPoints[i+1][j][t];
+							cons3 += 2*optPoints[i-1][j][t];
+							cons3 += 2*optPoints[i+1][j][t];
 						}
 						else if(0<i && i<width-1 && j==height-1)
 						{
 							N=2;
-							cons3 += wgtBundle*optPoints[i-1][j][t];
-							cons3 += wgtBundle*optPoints[i+1][j][t];
+							cons3 += 2*optPoints[i-1][j][t];
+							cons3 += 2*optPoints[i+1][j][t];
 						}
 						else if(i==0 && 0<j && j<height-1)
 						{
 							N=2;
-							cons3 += wgtBundle*optPoints[i][j-1][t];
-							cons3 += wgtBundle*optPoints[i][j+1][t];
+							cons3 += 2*optPoints[i][j-1][t];
+							cons3 += 2*optPoints[i][j+1][t];
 						}
 						else if(i==width-1 && 0<j && j<height-1)
 						{
 							N=2;
-							cons3 += wgtBundle*optPoints[i][j-1][t];
-							cons3 += wgtBundle*optPoints[i][j+1][t];
+							cons3 += 2*optPoints[i][j-1][t];
+							cons3 += 2*optPoints[i][j+1][t];
 						}
 						// N=0;cons3.x=0;cons3.y=0;
-					float gamma = 2*lambda*w_sum+wgtBundle*N+1;
+					float gamma = 2*lambda*w_sum+2*N+1;
 					// tmpPath[i][j][t] = tmpPath[i][j][t]/gamma;
 					// cout<<"cellPath:"<<endl<<cellPath[i][j][t]<<endl
 					// <<"cons2:"<<endl<<cons2<<endl

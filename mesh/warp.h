@@ -21,11 +21,14 @@ private:
 						bool all, Point offset = Point(0, 0), Size s = Size(100, 100));
 	void DrawPoints(Mat img, Mat & pointImg, vector<Point2f> pts, Point offset = Point(0, 0));
 	void compute_homo(float *C, const vector<Point2f> &pts, const vector<Point2f> &warpPts);
-	void findCut(Mat img, int* cutxy);
+	void findCut(Mat img, int* cutxy, vector<Point2i> corner);
+	vector<Point2i> compute_corner(vector<Point2f> warpPts0, float *Pinv);
 
 	asapWarp asap;
 	int width;
 	int height;
+	int cellwidth;
+	int cellheight;
 	vector<Point2f> cellPtsT; 
 	vector<Point2f> cellPts0;
 };

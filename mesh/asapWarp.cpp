@@ -376,6 +376,7 @@ void asapWarp::CalcHomos(BundleHomo & homos)
 
 void asapWarp::PrintVertex()
 {
+	cout << "print vertex: " << cellPts.size() << endl;
 	for (int i = 0; i < cellPts.size(); ++i)
 	{
 		if(i % width == 0)
