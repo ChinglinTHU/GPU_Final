@@ -3,72 +3,90 @@
 #include <vector>
 
 #include "opencv2/core.hpp"
+#include "opencv2/core/cuda.hpp"
+#include "opencv2/core/utility.hpp"
 
-#include "mesh.h"
-#include "quad.h"
+#include "opencv2/calib3d.hpp"
+//#include "opencv2/nonfree.hpp"
+
+//#include "mesh.h"
+//#include "quad.h"
+
+using namespace std;
+using namespace cv;
+using namespace cv::cuda;
+typedef vector<vector<Mat> > BundleHomo;
 
 class asapWarp
 {
 public:
-	asapWarp(int height, int width, int quadWidth, int quadHeight, float weight);
+    asapWarp();
+	asapWarp(int height, int width, int cellheight, int cellwidth, float weight);
 	~asapWarp();
-	void SetControlPts(std::vector<cv::Point> inputsPts, std::vector<cv::Point> outputsPts);
+	void SetControlPts(vector<Point2f> prevPts, vector<Point2f> nowPts, Mat globalH);
 	void Solve();
-	cv::Mat Warp(cv::Mat Img, int gap);
-	void CalcHomos(cv::Mat **homos);
+    void IterativeSolve(int iter = 20);
+    void SolvePoints(vector<vector<Point2f>> &prePts, vector<vector<Point2f>> &curPts);
+	void CalcHomos(BundleHomo & homos);
+    void PrintConstraintsSparse();
+    void PrintConstraints(bool all);
+    void PrintVertex();
+
+    Point2f compute_pos(int i, int j);
+    
+    Mat Constraints;
+    Mat Constants;
+
+    int *SmoothRow, *SmoothCol;
+    float* SmoothVal;
+    int *ARow, *ACol;
+    float* AVal;
+    float* B;
 
 	// smooth constraints
-	cv::Mat SmoothConstraints;
-	float SCc;
 	int num_smooth_cons;
-
 	// data constraints
-	// TODO: convert vector into ptr
-    std::vector<int> dataterm_element_i;
-    std::vector<int> dataterm_element_j;
-    std::vector<cv::Point> dataterm_element_orgPt;
-    std::vector<cv::Point> dataterm_element_desPt;
-    std::vector<float> dataterm_element_V00;
-    std::vector<float> dataterm_element_V01;
-    std::vector<float> dataterm_element_V10;
-    std::vector<float> dataterm_element_V11;
-    cv::Mat DataConstraints;
-    float DCc;
     int num_data_cons;
-        
         
     int rowCount;
     int columns;
     
-    std::vector<int> x_index;
-    std::vector<int> y_index;
+    vector<Point2f> now_point, prev_point;
+    float *weightsum;
+    vector<Point2f> prev_feature, now_feature;
     
-    // mesh
-    Mesh source, destin;
-    
+    vector<Point2f> cellPts;
+    int allVertexNum;
+
     // control points
-    std::vector<cv::Point> sourcePts, targetPts;
+    // vector<Point> sourcePts, targetPts;
     
-    
+    float weight;
     int height,width; // mesh height,mesh width
     int quadWidth,quadHeight; // quadWidth,%quadHeight
-    int 0imgHeight,imgWidth; // imgHeight,imgWidth
+    int imgHeight,imgWidth; // imgHeight,imgWidth
+    Mat globalH;
     
-    cv::Mat warpIm;
-    float gap;
+    //Mat warpIm;
+    //float gap;
 
 private:
-	void getSmoothWeight(cv::Point uv, cv::Point V1, cv::Point V2, cv::Point V3);
-	cv::Mat CreateSmoothCons(float weight);
-	cv::Mat CreateDataCons();
+	int CreateSmoothCons(float weight);
+    int CreateSmoothConsSparse(float weight);
 	// the triangles
-	void addCoefficient1(int i, int j, float weight);
-	void addCoefficient2(int i, int j, float weight);
-	void addCoefficient3(int i, int j, float weight);
-	void addCoefficient4(int i, int j, float weight);
-	void addCoefficient5(int i, int j, float weight);
-	void addCoefficient6(int i, int j, float weight);
-	void addCoefficient7(int i, int j, float weight);
-	void addCoefficient8(int i, int j, float weight);
-	void quadWarp(cv::Mat im, Quad q1, Quad q2);
+	void addSmoothCoefficient(int & cons, int i1, int j1, int i2, int j2, int i3, int j3, float weight);
+    void addSmoothCoefficientSparse(int & cons, int & I, int i1, int j1, int i2, int j2, int i3, int j3, float weight);
+    void addDataCoefficient(int & cons, Point2f pts, Point2f pts2);
+    void addDataCoefficientSparse(int & cons, int & I, Point2f prev_pt, Point2f now_pt);
+
+    float solveDataTerm(Point2f prev_pt, Point2f now_pt, float gamma);
+    float solveSmoothTerm(int i1, int j1, int i2, int j2, int i3, int j3, float weight, float gamma);
+
+	// void quadWarp(cv::Mat im, Quad q1, Quad q2);
+	// compute position by index
+	
+	Point2f compute_uv(const Point2f V1, const Point2f V2, const Point2f V3);
+	int index_x(int i, int j);
+	int index_y(int i, int j);
+    int index(int i, int j);
 };

@@ -18,7 +18,7 @@ public:
 		if (running) {
 			running = false;
 			auto diff = Now() - prev_start_;
-			count += std::chrono::duration_cast<std::chrono::microseconds>(diff).count();
+			count += std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
 		}
 	}
 	void Reset() {
@@ -31,4 +31,5 @@ public:
 	Timer() {Reset();}
 };
 
-#define printf_timer(timer) printf("Timer " #timer ": %lldus\n", timer.get_count());
+#define printf_timer(timer) printf("Timer: %lldms\n", timer.get_count());
+// #define printf_timer(str, timer) printf("%s -- Timer: %lldms\n", str, timer.get_count());
