@@ -27,7 +27,6 @@
 #include "./mesh/asapWarp.h"
 #include "./path/allPath.h"
 #include "./utils/Timer.h"
-//#include "./feature/MSOP.h"
 
 #define arg(name) cmd.get<string>(name)
 #define argb(name) cmd.get<bool>(name)
@@ -87,7 +86,7 @@ int main(int argc, const char **argv)
 			if(cur_frame.empty()) break;
 			cv::cvtColor(cur_frame, gray_frame, CV_BGR2GRAY);
 			if (true)
-			// if (s < 200)
+			//if (s < 400)
 			{
 				frames.push_back(cur_frame); // TODO: do i need to change its format?
 				gray_frames.push_back(gray_frame);
@@ -253,10 +252,8 @@ int main(int argc, const char **argv)
 		int nowcutxy[4];
 		printf("Image Synthesis: ");
 		vector<int> vec_minx, vec_maxx, vec_miny, vec_maxy;
-		for (int t = 0; t < min(1000, allpath.time); t++)
+		for (int t = 0; t < allpath.time; t++)
 		{
-			//if (t < 121)
-			//	continue;
 			//printf("Image Synthesis %d \n", t);
 
 			///* my new warpimg method
@@ -267,12 +264,30 @@ int main(int argc, const char **argv)
 			// W.warpImageMeshGPU(frames[t], warp_frame, allpath.getPath(t), allpath.getOptimizedPath(t));
 			W.warpImageMeshbyVertexGPU(frames[t], warp_frame, allpath.getcellPoints(t), allpath.getoptPoints(t), nowcutxy);
 			warp_frames.push_back(warp_frame);
-			///*
+			/*
 			cout << "time: " << t << endl;
 			cout << "\tminx:  " << nowcutxy[0] << "\tmaxx: " << nowcutxy[1] << endl;
 			cout << "\tminy:  " << nowcutxy[2] << "\tmaxy: " << nowcutxy[3] << endl;
 			//*/
 
+			/*
+			cout << "cellPts: " << endl;
+			vector<Point2f> cellpts = allpath.getcellPoints(t);
+			for (int j = 0; j < cuth+1; j++)
+			{
+				for (int i = 0; i < cutw+1; i++)
+					cout << cellpts[j*(cutw+1)+i] << ", ";
+				cout << endl;
+			}
+			cout << "optPts: " << endl;
+			cellpts = allpath.getoptPoints(t);
+			for (int j = 0; j < cuth+1; j++)
+			{
+				for (int i = 0; i < cutw+1; i++)
+					cout << cellpts[j*(cutw+1)+i] << ", ";
+				cout << endl;
+			}
+			//*/
 
 
 			// minx, maxx, miny, maxy
@@ -345,7 +360,7 @@ int main(int argc, const char **argv)
 			maxx = maxx > frames[0].cols-1 ? frames[0].cols-1 : maxx;
 		}
 
-		///* don't cut
+		/* don't cut
 		cout << "don't cut" << endl;
 		cout << "origin cut: " << "x - (" << minx << ", " << maxx << "), y - (" << miny << ", " << maxy << ")" << endl;
 		minx = miny = 0;
@@ -412,7 +427,7 @@ int main(int argc, const char **argv)
 		timer_count.Pause();
 		printf_timer(timer_count);
 
-		///*
+		/*
 		timer_count.Reset();
 		timer_count.Start();
 		printf("Write images: ");
@@ -434,7 +449,7 @@ int main(int argc, const char **argv)
 
 
 		string::size_type pAt = inputPath.find_last_of('.');
-		const string NAME = inputPath.substr(0, pAt) + "_stab" + inputPath.substr(pAt, inputPath.size() - pAt+1);
+		const string NAME = inputPath.substr(0, pAt) + "_stab.avi";
 		cout << "write video to " << NAME << endl;
 		VideoWriter outputVideo;  
 		outputVideo.open(NAME, VideoWriter::fourcc('X','V','I','D'), outputFps, cut_frames[0].size(), true);
@@ -444,7 +459,7 @@ int main(int argc, const char **argv)
 	        return -1;
 	    }
 
-	    /*
+	    ///*
 
 		timer_count.Reset();
 		timer_count.Start();
@@ -455,7 +470,7 @@ int main(int argc, const char **argv)
 		}
 		timer_count.Pause();
 		printf_timer(timer_count); 
-		*/
+		//*/
 
 	}
 	catch (const exception &e)

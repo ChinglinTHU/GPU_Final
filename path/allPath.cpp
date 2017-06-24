@@ -469,7 +469,10 @@ void allPath::jacobiSolver(int iter)
 
 void allPath::jacobiPointSolver(int iter)
 {
-	float lambda = 5.0; // TODO: need to optimize
+	//float lambda = 5.0; // TODO: need to optimize
+	float *lambda = new float[time];
+	for (int t = 0; t < time; t++)
+		lambda[t] = 5.0;
 	float cellsize = (height)*(width);
 	cout << "iter time:" << iter << endl;
 	for(int it = 0; it < iter; it++)
@@ -509,28 +512,28 @@ void allPath::jacobiPointSolver(int iter)
 			for (int i = 0; i < width; i++)
 				for (int j = 0; j < height; j++)
 				{
-			int sta_t, end_t;
-			sta_t = t-30 < 0 ? 0 : t-30;
-			end_t = t+30 > time-1 ? time-1 : t+30;
-			int num_omega = end_t - sta_t + 1;
-			float w[num_omega] = {0.0};
-			float w_sum = 0.0;
+					int sta_t, end_t;
+					sta_t = t-30 < 0 ? 0 : t-30;
+					end_t = t+30 > time-1 ? time-1 : t+30;
+					int num_omega = end_t - sta_t + 1;
+					float w[num_omega] = {0.0};
+					float w_sum = 0.0;
 
-			// calc weights
-			for (int r = sta_t; r <= end_t; r++)
-			{
-				// if(r == t)
-				// {
-				// 	w[r-sta_t] = 0.0;
-				// 	continue;
-				// }
-				float trans = abs(cellPoints[i][j][r].x - cellPoints[i][j][t].x) + 
-								abs(cellPoints[i][j][r].y - cellPoints[i][j][t].y);
-				// cout<<"trans = "<<trans<<endl;
-				w[r-sta_t] = gaussianD(float(r-t), 10.f);//*gaussianD(trans, 10.f)*10;
-				// cout<<"w[r] = "<<w[r-sta_t]<<endl;
-				w_sum += w[r-sta_t];
-			}
+					// calc weights
+					for (int r = sta_t; r <= end_t; r++)
+					{
+						// if(r == t)
+						// {
+						// 	w[r-sta_t] = 0.0;
+						// 	continue;
+						// }
+						float trans = abs(cellPoints[i][j][r].x - cellPoints[i][j][t].x) + 
+										abs(cellPoints[i][j][r].y - cellPoints[i][j][t].y);
+						// cout<<"trans = "<<trans<<endl;
+						w[r-sta_t] = gaussianD(float(r-t), 10.f);//*gaussianD(trans, 10.f)*10;
+						// cout<<"w[r] = "<<w[r-sta_t]<<endl;
+						w_sum += w[r-sta_t];
+					}
 
 					// 1st cons
 					// tmpPath[i][j][t] = cellPath[i][j][t].clone();
@@ -538,8 +541,8 @@ void allPath::jacobiPointSolver(int iter)
 					Point2f cons2(0,0);
 					for (int r = sta_t; r <= end_t; r++)
 					{
-						// tmpPath[i][j][t] += 2*lambda*w[r-sta_t]*optPath[i][j][r];
-						cons2 += 2*lambda*w[r-sta_t]*optPoints[i][j][r];
+						// tmpPath[i][j][t] += 2*lambda[t]*w[r-sta_t]*optPath[i][j][r];
+						cons2 += 2*lambda[t]*w[r-sta_t]*optPoints[i][j][r];
 					}
 
 					//3rd cons
@@ -583,7 +586,7 @@ void allPath::jacobiPointSolver(int iter)
 							cons3 += 2*optPoints[i][j+1][t];
 						}
 						// N=0;cons3.x=0;cons3.y=0;
-					float gamma = 2*lambda*w_sum+2*N+1;
+					float gamma = 2*lambda[t]*w_sum+2*N+1;
 					// tmpPath[i][j][t] = tmpPath[i][j][t]/gamma;
 					// cout<<"cellPath:"<<endl<<cellPath[i][j][t]<<endl
 					// <<"cons2:"<<endl<<cons2<<endl
@@ -591,6 +594,23 @@ void allPath::jacobiPointSolver(int iter)
 					// <<"gamma:"<<gamma<<endl;
 					tmpPoints[i][j][t] = (cellPoints[i][j][t] + cons2 + cons3)/gamma;
 				}
+
+			Point2f diff = tmpPoints[width/2][height/2][t] - cellPoints[width/2][height/2][t];
+			float diffx, diffy;
+			Point2f pointsdiff = cellPoints[width/2+1][height/2+1][t] - cellPoints[width/2][height/2][t];
+			diffx = abs(pointsdiff.x);
+			diffy = abs(pointsdiff.y);
+			pointsdiff = cellPoints[width/2+1][height/2][t] - cellPoints[width/2][height/2][t];
+			diffx = max(diffx, abs(pointsdiff.x));
+			diffy = max(diffy, abs(pointsdiff.y));
+			pointsdiff = cellPoints[width/2][height/2+1][t] - cellPoints[width/2][height/2][t];
+			diffx = max(diffx, abs(pointsdiff.x));
+			diffy = max(diffy, abs(pointsdiff.y));
+			if (abs(diff.x) > diffx/2 || abs(diff.y) > diffy/2 )
+			{
+				lambda[t] /= 10;
+				//cout << "disconnect t: " << t << endl;
+			}
 		}
 		// need deep copy here again
 		// for(int t = 0;t<time;t++)
@@ -599,6 +619,26 @@ void allPath::jacobiPointSolver(int iter)
 		// 		{
 		// 			optPoints[i][j][t] = tmpPoints[i][j][t].clone();
 		// 		}
+
+		// smooth lambda
+		float *tmp = new float[time];
+		for (int t = 0; t < time; t++)
+		{
+			tmp[t] = lambda[t];
+			lambda[t] = 0;
+		}
+		for (int t = 0; t < time; t++)
+		{
+			int N = 0; 
+			for (int T = max(t-5, 0); T <= min(t+5, time-1); T++)
+			{
+				N++;
+				lambda[t] += tmp[T];
+			}
+			lambda[t] /= N;
+			//lambda[t] = 5.0;
+		}
+		//cout << "what's wrong" << endl;
 		optPoints = tmpPoints;
 	}
 
