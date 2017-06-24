@@ -56,6 +56,8 @@ public:
     // vector<PtsPath> getoptPoints(int t);
     vector<Point2f> getcellPoints(int t);
     vector<Point2f> getoptPoints(int t);
+    void printcellPoints(int t);
+    void printoptPoints(int t);
 
     int height, width, time; // mesh height,mesh width
 

@@ -522,15 +522,15 @@ void allPath::jacobiPointSolver(int iter)
 					// calc weights
 					for (int r = sta_t; r <= end_t; r++)
 					{
-						// if(r == t)
-						// {
-						// 	w[r-sta_t] = 0.0;
-						// 	continue;
-						// }
-						float trans = abs(cellPoints[i][j][r].x - cellPoints[i][j][t].x) + 
-										abs(cellPoints[i][j][r].y - cellPoints[i][j][t].y);
+						if(r == t)
+						{
+							w[r-sta_t] = 0.0;
+							continue;
+						}
+						float trans = (abs(cellPoints[i][j][r].x - cellPoints[i][j][t].x) + 
+										abs(cellPoints[i][j][r].y - cellPoints[i][j][t].y))/1000.0;
 						// cout<<"trans = "<<trans<<endl;
-						w[r-sta_t] = gaussianD(float(r-t), 10.f);//*gaussianD(trans, 10.f)*10;
+						w[r-sta_t] = gaussianD(float(r-t), 10.f);//*gaussianD(trans, 1.f);
 						// cout<<"w[r] = "<<w[r-sta_t]<<endl;
 						w_sum += w[r-sta_t];
 					}
@@ -784,4 +784,32 @@ vector<Point2f> allPath::getoptPoints(int t)
 			P[j*width+i] = optPoints[i][j][t];
 		}
 	return P;
+}
+
+void allPath::printcellPoints(int t)
+{
+	if (t < 0 || t > time-1)
+		throw runtime_error("allPath::getcellPoints: index can only inside the cell.\n");
+	for(int j = 0; j<height;j++)
+	{
+		for (int i = 0; i<width; i++)
+		{
+			cout<<cellPoints[i][j][t];
+		}
+		cout<<endl;
+	}
+}
+
+void allPath::printoptPoints(int t)
+{
+	if (t < 0 || t > time-1)
+		throw runtime_error("allPath::getoptPoints: index can only inside the cell.\n");
+	for(int j = 0; j<height;j++)
+	{
+		for (int i = 0; i<width; i++)
+		{
+			cout<<optPoints[i][j][t];
+		}
+		cout<<endl;
+	}
 }
