@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html>
+<title>gpgpu final project</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<style>
+body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif;}
+body, html {
+    height: 100%;
+    color: #777;
+    line-height: 1.8;
+}
+.member-info {
+  font-family: 微軟正黑體;
+}
+
+/* Create a Parallax Effect */
+.bgimg-1, .bgimg-2, .bgimg-3 {
+    background-attachment: fixed;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 720px;
+}
+
+/* First image (Logo. Full height) */
+.bgimg-1 {
+    background-image: url('./images/teaser.JPG');
+    min-height: 100%;
+}
+
+.w3-wide {letter-spacing: 10px;}
+.w3-hover-opacity {cursor: pointer;}
+
+/* Turn off parallax scrolling for tablets and phones */
+@media only screen and (max-device-width: 1024px) {
+    .bgimg-1, .bgimg-2, .bgimg-3 {
+        background-attachment: scroll;
+    }
+}
+
+#video-compare-container {
+  display: inline-block;
+  line-height: 0;
+  position: relative;
+  width: 100%;
+  padding-top: 42.3%;
+}
+#video-compare-container > video {
+  width: 100%;
+  position: absolute;
+  top: 0; height: 100%;
+}
+#video-clipper {
+  width: 50%; position: absolute;
+  top: 0; bottom: 0;
+  overflow: hidden;
+}
+#video-clipper video {
+  width: 200%;
+  postion: absolute;
+  height: 100%;
+}
+</style>
+<body>
+
+<!-- Navbar (sit on top) -->
+<div class="w3-top">
+  <div class="w3-bar" id="myNavbar">
+    <a class="w3-bar-item w3-button w3-hover-black w3-hide-medium w3-hide-large w3-right" href="javascript:void(0);" onclick="toggleFunction()" title="Toggle Navigation Menu">
+      <i class="fa fa-bars"></i>
+    </a>
+    <a href="#home" class="w3-bar-item w3-button">HOME</a>
+    <a href="#intro" class="w3-bar-item w3-button w3-hide-small"><i class="fa fa-book"></i> INTRODUCTION</a>
+    <a href="#algo" class="w3-bar-item w3-button w3-hide-small"><i class="fa fa-cubes"></i>ALGORITHM</a>
+    <a href="#demo" class="w3-bar-item w3-button w3-hide-small"><i class="fa fa-play-circle"></i> DEMO</a>
+    <a href="#member" class="w3-bar-item w3-button w3-hide-small"><i class="fa fa-user"></i> MEMBER</a>
+    <a target="_blank" href="http://www.liushuaicheng.org/SIGGRAPH2013/index.htm" class="w3-bar-item w3-button w3-hide-small"><i class="fa fa-file-text"></i> REFERENCE</a>
+  </div>
+</div>
+
+<!-- First Parallax Image with Logo Text -->
+<div class="bgimg-1 w3-display-container w3-opacity-min" id="home">
+  <div class="w3-display-middle" style="white-space:nowrap;">
+    <span class="w3-center w3-padding-large w3-black w3-xlarge w3-animate-opacity">Video Stablization with CUDA Implementation</span>
+  </div>
+</div>
+
+<!-- Container (intro Section) -->
+<div class="w3-content w3-container w3-padding-64" id="intro">
+  <h3 class="w3-center">INTRODUCTION</h3>
+  <p>A video captured with a hand-held device (e.g., a cell-phone or a portable camcorder) often appears remarkably shaky and undi-rected. Digital videostabilization improves the video quality by re-moving unwanted camera motion. We implement a video stabilization method [Liu et al. 2013] which models cam-era motion with a bundle of (multiple) camera paths. The model is based on a mesh-based, spatially-variant motion representation and an adaptive, space-time path optimization. Also, the motion representation allows users to fundamentally handle parallax and rolling shutter effects while it does not require long feature trajectories or sparse 3D reconstruction. Furthermore, we speed up this method by parallelizing some parts with CUDA support.</p>
+  <div class="w3-row">
+    <div class="w3-col m6 w3-center w3-padding-large">
+      <p><b>A Single Global Path</b></p><br>
+      <img src="./images/global.jpg" class="w3-round w3-image w3-hover-opacity-off" alt="Photo of Me" width="500" height="333">
+    </div>
+
+    <!-- Hide this text on small devices -->
+    <div class="w3-col m6 w3-center w3-padding-large">
+      <p><b>Bundled Paths</b></p><br>
+      <img src="./images/bundle.jpg" class="w3-round w3-image w3-hover-opacity-off" alt="Photo of Me" width="500" height="333">
+    </div>
+  </div>
+</div>
+
+<div class="w3-content w3-container w3-padding-64" id="algo">
+  <h3 class="w3-center">ALGORITHM</h3>
+  <h5>Overall Pipeline</h5>
+  <ul>
+    <li>
+       Camera Path Computation
+       <ul>
+           <li>
+               Feature detection &amp; descriptor:  SURF
+           </li>
+           <li>
+               Model estimation:Solve a sparse linear system
+           </li>
+           <li>
+               Robust Estimation:Outlier rejection using RANSAC
+           </li>
+       </ul>   
+    </li>
+    <li>
+        Path Optimization
+        <ul>
+            <li>
+                Jacobi-based iterative solver: for about 20 iterations
+            </li>
+        </ul>
+    </li>
+    <li>
+        Result Synthesis
+    </li>
+  </ul>
+  <h5>Model Estimation</h5>
+  <ul>
+    <li>
+        Data term
+        <p>$$E_d(\hat{V}) = \sum_p \left\lVert\hat{V}_p w_p - \hat{p}\right\rVert^2$$</p>
+        <p>The feature p can be represented by a 2D bilinear interpolation of the four vertices \(V_p\) of the enclosing grid cell \(p = V_p w_p\) , where \(w_p\) are interpolation weight. We expect that the corresponding feature \(\hat{p}\) can be represented by the same weights of the warped grid vertices \(\hat{V}_p\) . We decide to get p by using optical flow in opencv.</p>
+        <table border="1" class="w3-center" align="center">
+            <caption>Speed comparison</caption>
+            <tr>
+                <td style="padding-left: 1em; padding-right: 1em">(opencv) cuda feature detect + brute force matching</td>
+                <td style="padding-left: 1em; padding-right: 1em">(opencv) feature tracking</td>
+            </tr>
+            <tr>
+                <td>61ms/frame</td>
+                <td>17ms/frame</td>
+            </tr>
+        </table>
+    </li>
+    <li>
+        Shape-preserving term
+        <p>$$E_s(\hat{V}) = \sum_\hat{v} \left\lVert\hat{v} - \hat{v}_1 -sR_{90}(\hat{v}_0 - \hat{v}_1)\right\rVert, R_{90} = 
+        \begin{bmatrix}0 & 1\\-1 & 0\end{bmatrix},$$</p>
+        <p>where \(s = \left\lVert v - v_1\right\rVert / \left\lVert v_0 - v_1\right\rVert\) is a known scalar computed form the initial mesh.</p>
+    </li>
+    <li>
+        Final energy
+        <p>$$E(\hat{V}) = E_d(\hat{V}) + \alpha E_s(\hat{V}), $$</p>
+        <p>where \(\alpha\) is an important weight to control the amount of regularization and we set \(\alpha = 3\). The bigger \(\alpha\) we choose, the more rectangular the grid is. The above method is called ASAP(as similar as possible). Since the final energy is quadratic, the warped mesh \(\hat{V}\) can be solved by a sparse linear system solver. To solve the system, we have tried <i>solve</i> function in opencv, and the speed is very slow. Another method we have tried is <i>cusolver</i>, and the precision is bad. Finally, we choose Newton's method:$$V_1 = V_0 - \gamma\nabla E(V_0)$$ to iteratively upadte \(V\) until final \(\hat{V}\) .</p>
+        <table border="1" class="w3-center" align="center">
+            <caption>Speed comparison</caption>
+            <tr>
+                <td style="padding-left: 1em; padding-right: 1em">(solve) LU decomposition</td>
+                <td style="padding-left: 1em; padding-right: 1em">(solve) QR decomposition</td>
+                <td style="padding-left: 1em; padding-right: 1em">Newton's method</td>
+            </tr>
+            <tr>
+                <td>320ms</td>
+                <td>50ms</td>
+                <td>0.156ms</td>
+            </tr>
+        </table>
+    </li>
+    <li>
+        Estimating homographies
+        <p>$$\hat{V}_i = F_i(t) V_i,$$</p>
+        <p>where \(V_i\) and \(\hat{V}_i\) are the four vertices before and after the warping. Thus, local homography \(F_i(t)\) in the grid cell i of frame t can be estimated. To facilitate the warping estimation, we use global homography \(\bar{F}(t)\) , which is computed by <i>findHomography</i> in opencv, to bring matching features closer.</p>
+    </li>
+  </ul>
+  <h5>Robust Estimation</h5>
+    <ul>We use RANSAC to reject outlier features, but we do not implement adaptive regulariztion mentioned in the paper.</ul>
+  <h5>Bundled Camera Paths</h5>
+    <ul>
+        <p>If we use \(C_i(t) = F_i(t)F_i(t-1) \cdot\cdot\cdot F_i(0)\)(used in the reference paper) to repesent camera path, each grid cell will be discontinuess. Treating \(V_c\) as feature points, we can require:
+        $$V_c(t) = G_c(t) w_c,$$</p>
+        <p>where \(G_c\) is four vertices of new grid that covers \(V_c\) and \(w_c\) is the corresponding weight. By applying same \(w_c\) to previous frame, we can get \(V_c(t)\) position according to frame(0):
+        $$V_c(t-1) = G_c(t-1) w_c$$</p>
+    </ul>
+  <h5>Path Optimization</h5>
+    <ul>
+        <li>
+            Optimizing a Single Path
+            <p>While smooting the camera path, we need to consider multiple factors: removing jitters, avoiding excessive cropping, and minimizing geometrical distortions. Given an original path \(C = \{C(t)\}\) , we seek an optimized path \(P = \{P(t)\}\) by minimizing the following function:
+            $$O(\{P(t)\}) = \sum_t(\left\lVert P(t) - C(t)\right\rVert^2 + \lambda_t \sum_{r\in\Omega_t} w_{t,r} (C) \cdot \left\lVert P(t) - P(r) \right\rVert^2), $$</p>
+            <p>where \(\Omega_t\) are the neighborhood at frame t. The othor terms are:</p>
+            <ul>
+                <li>
+                    data term \(\left\lVert P(t) - C(t)\right\rVert^2\) enforcing the new camera path to be close to the original one to reduce cropping and distortion;
+                </li>
+                <li>
+                    smoothness term \(\left\lVert P(t) - P(r) \right\rVert^2\) stabilizing the path;
+                </li>
+                <li>
+                    weight \(w_{t,r} (C)\) to preserve motion discontinuities under fast panning/rotation or scene transition;
+                </li>
+                <li>
+                    parameter \(\lambda_t\) to balance the above two terms;
+                </li>
+            </ul>
+            <p>Our solution is updated by a Jacobi-based iteration:
+            $$P^{(\xi+1)} (t) = \frac{1}{\gamma} (C(t) + \mathop{\sum_{\gamma\in\Omega_t}}_{\gamma\neq t} 2\lambda_t w_{t,r} P^{(\xi)} (r)), $$</p>
+            <p>where \(\gamma = 1 + 2\lambda_t \sum_{\gamma\in\Omega_t, \gamma\neq t} w_{t,r}\)</p>
+        </li>
+        <li>
+            Discontinuity-preserving
+            <p>$$w_{t,r} = G_t(\left\lVert r - t \right\rVert) \cdot G_m(\left\lVert C(r) - C(t) \right\rVert)$$</p>
+            <p>We use \(G_t()\) to suppress high frquency jitters, while using \(G_m()\) to preserves the camera motion in low-frequency. In our implementation, we set \(\Omega_t\) to 60 neighboring frames.</p>
+        </li>
+        <li>
+            Cropping and distortion control
+            <p>\(\lambda_t\) is used to balance data term and smooth term. The bigger it is, the higher corpping ration is. \(\lambda_t\) is initialized to 5. For any frame that does not satisfy the user requirements (cropping ratio or distortion is smaller than a pre-defined threshold), we decrease its parameter \(\lambda_t\) by a step \(1/10\lambda_t\) and re-run the optimization. We not only decrease \(\lambda_t\) at specific frame, but also take average in the neighbor of specific frame to smooth in temporality.</p>
+        </li>
+        <li>
+            Optimizing Bundled Paths
+            <p>Our motion model generates a bundle of camera paths. If these paths are optimized independently, neighboring paths could be less consistent, which may generate distortion in the final rendered video. Hence, we do a space-time optimization of all paths by min-imizing the following objective function:
+            $$\sum_i O(\{P_i(t)\}) + \sum_t \sum_{j \in N(i)} \left\lVert P_i(t) - P_j(t) \right\rVert^2, $$</p>
+            <p>where \(N(i)\) includes eight neighbors of the grid cell i. The Jacobi-based iteration will become:
+            $$P^{(\xi+1)}_i (t) = \frac{1}{\gamma'} (C_i(t) + \mathop{\sum_{\gamma\in\Omega_t}}_{\gamma\neq t} 2\lambda_t w_{t,r} P^{(\xi)}_i (r) + \mathop{\sum_{j\in N(i)}}_{j\neq i} 2P^{(\xi)}_j (t))$$</p>
+            <p>where \( \gamma' = 2\lambda_t \sum_{r \in \Omega_t , r \neq t} w_{t,r} + 2N(i) - 1\) . We iterate 20 times to optimize camera paths.</p> 
+        </li>
+    </ul>
+  <h5>Result Synthesis</h5>
+    <ul>
+        <img src="./images/cropping.jpg" class="w3-round w3-image w3-hover-opacity-off" alt="Photo of Me" width="400" height="300"><br>
+        <p>First, we warp the original frame to C. Then, we calculate a smooth path P. Finally, we warp P to the final result. Following are two methods:</p>
+        <li>
+            <i>Blending</i> in opencv
+            <p>Using homography to warp each grid cell in original frame, then blend them into an image C. To warp image P to result frame, we apply the same method again. The bad thing is that  there exists some seam in the result frame.</p>
+        </li>
+        <li>
+            Calculate position after warping for each pixel with CUDA
+        </li>
+        <table border="1" class="w3-center" align="center">
+            <caption>Speed comparison</caption>
+            <tr>
+                <td style="padding-left: 1em; padding-right: 1em">(opencv) blending</td>
+                <td style="padding-left: 1em; padding-right: 1em">CUDA</td>
+            </tr>
+            <tr>
+                <td>1320ms/frame</td>
+                <td>16ms/frame</td>
+            </tr>
+        </table>
+    </ul>
+</div>
+
+<!-- Container (demo Section) -->
+<div class="w3-content w3-container w3-padding-64" id="demo">
+  <h3 class="w3-center">DEMO</h3>
+  <div class="w3-row">
+    <div class="w3-col m4 w3-center">
+      <p>original video</p>
+      <video loop autoplay width="320" height="180" controls>
+        <source src="./videos/11.mp4" type="video/mp4">
+      </video>
+    </div>
+    <div class="w3-col m4 w3-center">
+      <p>bundled path</p>
+      <video loop autoplay width="320" height="180" controls>
+        <source src="./videos/11stb.mp4" type="video/mp4">
+      </video>
+    </div>
+    <div class="w3-col m4 w3-center">
+      <p>our result</p>
+      <video loop autoplay width="320" height="180" controls>
+        <source src="./videos/11_stab.mp4" type="video/mp4">
+      </video>
+    </div>
+  </div>
+  <div class="w3-row">
+    <div class="w3-col m4 w3-center">
+      <video loop autoplay width="320" height="180" controls>
+        <source src="./videos/3.mp4" type="video/mp4">
+      </video>
+    </div>
+    <div class="w3-col m4 w3-center">
+      <video loop autoplay width="320" height="180" controls>
+        <source src="./videos/3stb.mp4" type="video/mp4">
+      </video>
+    </div>
+    <div class="w3-col m4 w3-center">
+      <video loop autoplay width="320" height="180" controls>
+        <source src="./videos/3_stab.mp4" type="video/mp4">
+      </video>
+    </div>
+  </div>
+  <div class="w3-row">
+    <div class="w3-col m4 w3-center">
+      <video loop autoplay width="320" height="180" controls>
+        <source src="./videos/2.mp4" type="video/mp4">
+      </video>
+    </div>
+    <div class="w3-col m4 w3-center">
+      <video loop autoplay width="320" height="180" controls>
+        <source src="./videos/2stb.mp4" type="video/mp4">
+      </video>
+    </div>
+    <div class="w3-col m4 w3-center">
+      <video loop autoplay width="320" height="180" controls>
+        <source src="./videos/2_stab.mp4" type="video/mp4">
+      </video>
+    </div>
+  </div>
+  <!--div id="video-compare-container">
+    /*put stablized here*/
+    <video loop autoplay poster="https://s3-us-west-2.amazonaws.com/s.cdpn.io/4273/dirty.jpg">
+      <source src=./videos/0_homography.mp4>
+    </video>
+    <div id="video-clipper">
+    /*put unstablized here*/
+      <video loop autoplay poster="https://s3-us-west-2.amazonaws.com/s.cdpn.io/4273/clean.jpg">
+        <source src=./videos/0.mp4>
+      </video>
+    </div>
+  </div-->
+  <h3 class="w3-center">SPEED COMPARASION</h3>
+  <p class="w3-center">Under 640 x 360 resolution can achieve 25.54 fps</p>
+  <p class="w3-center">Under 1280 x 720 resolution is 7 times faster than paper</p>
+  <table border="1" class="w3-center" align="center">
+            <tr>
+                <td style="padding-left: 1em; padding-right: 1em"></td>
+                <td style="padding-left: 1em; padding-right: 1em">paper</td>
+                <td style="padding-left: 1em; padding-right: 1em">ours</td>
+            </tr>
+            <tr>
+                <td>extracting features</td>
+                <td>300ms</td>
+                <td>33ms</td>
+            </tr>
+            <tr>
+                <td>estimating motion</td>
+                <td>50ms</td>
+                <td>0.1ms</td>
+            </tr>
+            <tr>
+                <td style="padding-left: 1em; padding-right: 1em">rendering the final result</td>
+                <td>30ms</td>
+                <td>21ms</td>
+            </tr>
+            <tr>
+                <td>total time</td>
+                <td>400ms</td>
+                <td>57ms</td>
+            </tr>
+            <tr>
+                <td>fps</td>
+                <td>2.5fps</td>
+                <td>17.5fps</td>
+            </tr>
+        </table>
+</div>
+
+<!-- Container (member Section) -->
+<div class="w3-content w3-container w3-padding-64" id="member">
+  <h3 class="w3-center">MEMBER</h3>
+  <div class="w3-row">
+    <div class="w3-col m4 w3-center w3-padding-large member-info">
+      <p><b>陳學儀</b></p><br>
+      <img src="http://graph.facebook.com/100000259398627/picture?type=large" class="w3-round w3-image w3-hover-opacity-off" alt="Photo of Me" width="200" height="200">
+    </div>
+
+    <!-- Hide this text on small devices -->
+    <div class="w3-col m4 w3-center w3-padding-large member-info">
+      <p><b>陳卓唅</b></p><br>
+      <img src="./images/panda.jpg" class="w3-round w3-image w3-hover-opacity-off" alt="Photo of Me" width="200" height="200">
+    </div>
+    <div class="w3-col m4 w3-center w3-padding-large member-info">
+      <p><b>楊騏瑄</b></p><br>
+      <img src="http://graph.facebook.com/100000356380592/picture?type=large" class="w3-round w3-image w3-hover-opacity-off" alt="Photo of Me" width="200" height="200">
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="w3-center w3-black w3-padding-64 w3-opacity w3-hover-opacity-off">
+  <a href="#home" class="w3-button w3-light-grey"><i class="fa fa-arrow-up w3-margin-right"></i>To the top</a>
+</footer>
+
+<script>
+/*function trackLocation(e) {
+  var rect = videoContainer.getBoundingClientRect(),
+      position = ((e.pageX - rect.left) / videoContainer.offsetWidth)*100;
+  if (position <= 100) { 
+    videoClipper.style.width = position+"%";
+    clippedVideo.style.width = ((100/position)*100)+"%";
+    clippedVideo.style.zIndex = 3;
+  }
+}
+var videoContainer = document.getElementById("video-compare-container"),
+videoClipper = document.getElementById("video-clipper"),
+clippedVideo = videoClipper.getElementsByTagName("video")[0];
+videoContainer.addEventListener( "mousemove", trackLocation, false); 
+videoContainer.addEventListener("touchstart",trackLocation,false);
+videoContainer.addEventListener("touchmove",trackLocation,false);*/
+
+// Change style of navbar on scroll
+window.onscroll = function() {myFunction()};
+function myFunction() {
+    var navbar = document.getElementById("myNavbar");
+    if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
+        navbar.className = "w3-bar" + " w3-card-2" + " w3-animate-top" + " w3-white";
+    } else {
+        navbar.className = navbar.className.replace(" w3-card-2 w3-animate-top w3-white", "");
+    }
+}
+
+// Used to toggle the menu on small screens when clicking on the menu button
+function toggleFunction() {
+    var x = document.getElementById("navDemo");
+    if (x.className.indexOf("w3-show") == -1) {
+        x.className += " w3-show";
+    } else {
+        x.className = x.className.replace(" w3-show", "");
+    }
+}
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBu-916DdpKAjTmJNIgngS6HL_kDIKU0aU&callback=myMap"></script>
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script> 
+<!--
+To use this code on your website, get a free API key from Google.
+Read more at: https://www.w3schools.com/graphics/google_maps_basic.asp
+-->
+
+</body>
+</html>
