@@ -471,7 +471,22 @@ int main(int argc, const char **argv)
 		timer_count.Pause();
 		printf_timer(timer_count); 
 		//*/
+        namedWindow("Video Player", WINDOW_AUTOSIZE);
+        for (int t = 0; t < cut_frames.size(); t++)
+        {   
+            
+            Mat frame_warp = Mat::zeros(frames[t].rows + cut_frames[t].rows, frames[t].cols, CV_8UC3);
+            frames[t].copyTo(frame_warp(Rect(0, 0, frames[t].cols, frames[t].rows)));
+            cut_frames[t].copyTo(frame_warp(Rect(0, frames[t].rows, cut_frames[t].cols, cut_frames[t].rows)));
 
+            //imshow("Video Player", cut_frames[t]);
+            imshow("Video Player", frame_warp);
+            char c = waitKey(2);
+            if(t == cut_frames.size() - 1)
+                t = 0;
+            //按ESC退出
+            if (c == 27) break;
+        }
 	}
 	catch (const exception &e)
 	{
